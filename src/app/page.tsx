@@ -29,8 +29,10 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import DownloadIcon from '@mui/icons-material/Download';
 import TableViewIcon from '@mui/icons-material/TableView';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
 import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
+import { downloadTextFile, generateTimestampedTextFilename, formatExtractedTextForDownload } from '@/utils/text';
 import { DEFAULT_PROMPT } from '@/utils/bedrock';
 import PromptEditor from '@/components/PromptEditor';
 
@@ -137,6 +139,22 @@ export default function Home() {
     }
   };
 
+  // テキストファイルダウンロードハンドラー
+  const handleDownloadText = () => {
+    if (!extractedText) {
+      setError('ダウンロードするテキストデータがありません');
+      return;
+    }
+
+    try {
+      const formattedText = formatExtractedTextForDownload(extractedText);
+      const filename = generateTimestampedTextFilename('extracted_text');
+      downloadTextFile(formattedText, filename);
+    } catch {
+      setError('テキストファイルの生成中にエラーが発生しました');
+    }
+  };
+
   // 画像からテキストを抽出する関数
   const extractTextFromImage = async (file: File): Promise<string> => {
     try {
@@ -211,6 +229,10 @@ export default function Home() {
         
         const data = await response.json();
         setQuestions(data.questions);
+        // PDFからも抽出されたテキストを設定
+        if (data.extractedText) {
+          setExtractedText(data.extractedText);
+        }
       } else {
         // 画像ファイルの場合はクライアントサイドでテキスト抽出
         const extractedTextContent = await extractTextFromMultipleImages(files);
@@ -379,9 +401,19 @@ export default function Home() {
       
       {extractedText && (
         <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" gutterBottom>
-            抽出されたテキスト
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <Typography variant="h5">
+              抽出されたテキスト
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<TextSnippetIcon />}
+              onClick={handleDownloadText}
+              color="primary"
+            >
+              テキストファイルをダウンロード
+            </Button>
+          </Box>
           <Divider sx={{ mb: 2 }} />
           <Box sx={{ maxHeight: '300px', overflow: 'auto', whiteSpace: 'pre-wrap', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
             {extractedText}

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       customPrompt || undefined
     );
 
-    return NextResponse.json({ questions });
+    return NextResponse.json({ questions, extractedText });
   } catch (error) {
     console.error('Error processing PDFs:', error);
     return NextResponse.json(
