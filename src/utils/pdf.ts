@@ -37,7 +37,7 @@ export async function extractTextFromPdf(pdfBuffer: Buffer, filename: string): P
       fs.unlinkSync(textFilePath);
       
       return extractedText;
-    } catch (error) {
+    } catch {
       // pdftotext が利用できない場合は、代替手段を使用
       console.log('pdftotext not available, using alternative method');
       
