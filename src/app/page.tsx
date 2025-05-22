@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, useEffect } from 'react';
+import { useState, useRef, ChangeEvent, FormEvent } from 'react';
 import * as Tesseract from 'tesseract.js';
 import {
   Box,
@@ -8,7 +8,6 @@ import {
   Typography,
   Paper,
   CircularProgress,
-  TextField,
   List,
   ListItem,
   ListItemText,
@@ -19,7 +18,6 @@ import {
   Alert,
   Snackbar,
   Container,
-  Grid,
   Slider,
   Stack,
   Tabs,
@@ -111,7 +109,7 @@ export default function Home() {
       const csvContent = convertQuestionsToCSV(questions);
       const filename = generateTimestampedFilename('qa_data');
       downloadCSV(csvContent, filename);
-    } catch (err) {
+    } catch {
       setError('CSVファイルの生成中にエラーが発生しました');
     }
   };
@@ -126,7 +124,7 @@ export default function Home() {
     try {
       const filename = generateTimestampedXLSXFilename('qa_data');
       downloadXLSX(questions, filename);
-    } catch (err) {
+    } catch  {
       setError('XLSXファイルの生成中にエラーが発生しました');
     }
   };
