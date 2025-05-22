@@ -1,5 +1,10 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import 'dotenv-safe/config';
+import { config } from 'dotenv';
+
+// 開発環境でのみdotenvを読み込む
+if (process.env.NODE_ENV !== 'production') {
+  config();
+}
 
 // AWS Bedrock クライアントの初期化
 const bedrockClient = new BedrockRuntimeClient({
