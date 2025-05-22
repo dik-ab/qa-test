@@ -23,11 +23,16 @@ import {
   Slider,
   Stack,
   Tabs,
-  Tab
+  Tab,
+  ButtonGroup
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
+import DownloadIcon from '@mui/icons-material/Download';
+import TableViewIcon from '@mui/icons-material/TableView';
+import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
+import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
 
 // 質問と回答の型定義
 interface Question {
@@ -93,6 +98,37 @@ export default function Home() {
   // 質問数変更ハンドラー
   const handleNumQuestionsChange = (_event: Event, value: number | number[]) => {
     setNumQuestions(value as number);
+  };
+
+  // CSVダウンロードハンドラー
+  const handleDownloadCSV = () => {
+    if (questions.length === 0) {
+      setError('ダウンロードする質問データがありません');
+      return;
+    }
+
+    try {
+      const csvContent = convertQuestionsToCSV(questions);
+      const filename = generateTimestampedFilename('qa_data');
+      downloadCSV(csvContent, filename);
+    } catch (err) {
+      setError('CSVファイルの生成中にエラーが発生しました');
+    }
+  };
+
+  // XLSXダウンロードハンドラー
+  const handleDownloadXLSX = () => {
+    if (questions.length === 0) {
+      setError('ダウンロードする質問データがありません');
+      return;
+    }
+
+    try {
+      const filename = generateTimestampedXLSXFilename('qa_data');
+      downloadXLSX(questions, filename);
+    } catch (err) {
+      setError('XLSXファイルの生成中にエラーが発生しました');
+    }
   };
 
   // 画像からテキストを抽出する関数
@@ -326,9 +362,25 @@ export default function Home() {
       
       {questions.length > 0 && (
         <Paper elevation={3} sx={{ p: 3 }}>
-          <Typography variant="h5" gutterBottom>
-            生成されたクエスチョンデータ
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <Typography variant="h5">
+              生成されたクエスチョンデータ
+            </Typography>
+            <ButtonGroup variant="outlined" color="primary">
+              <Button
+                startIcon={<DownloadIcon />}
+                onClick={handleDownloadCSV}
+              >
+                CSV
+              </Button>
+              <Button
+                startIcon={<TableViewIcon />}
+                onClick={handleDownloadXLSX}
+              >
+                XLSX
+              </Button>
+            </ButtonGroup>
+          </Box>
           <Divider sx={{ mb: 2 }} />
           
           {questions.map((item, index) => (
