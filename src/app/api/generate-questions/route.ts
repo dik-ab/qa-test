@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractTextFromMultiplePdfs } from '@/utils/pdf';
 import { generateQuestionsFromText } from '@/utils/bedrock';
 
-export const maxDuration = 300; // 5分のタイムアウト
+export const maxDuration = 60; // 60秒のタイムアウト（Vercel hobbyプランの上限）
 
 export async function POST(request: NextRequest) {
   try {
