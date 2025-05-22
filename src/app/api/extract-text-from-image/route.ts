@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const extractedText = formData.get('extractedText') as string;
     const numQuestions = Number(formData.get('numQuestions') || 5);
+    const customPrompt = formData.get('customPrompt') as string | null;
 
     if (!extractedText) {
       return NextResponse.json(
@@ -23,8 +24,12 @@ export async function POST(request: NextRequest) {
       ? extractedText.substring(0, maxTextLength) + '...(テキストが長すぎるため切り詰められました)'
       : extractedText;
 
-    // クエスチョンデータを生成
-    const questions = await generateQuestionsFromText(truncatedText, numQuestions);
+    // クエスチョンデータを生成（カスタムプロンプトがあれば使用）
+    const questions = await generateQuestionsFromText(
+      truncatedText, 
+      numQuestions, 
+      customPrompt || undefined
+    );
 
     return NextResponse.json({ questions });
   } catch (error) {
