@@ -31,6 +31,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import TableViewIcon from '@mui/icons-material/TableView';
 import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
 import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
+import { DEFAULT_PROMPT } from '@/utils/bedrock';
+import PromptEditor from '@/components/PromptEditor';
 
 // 質問と回答の型定義
 interface Question {
@@ -50,6 +52,7 @@ export default function Home() {
   const [numQuestions, setNumQuestions] = useState<number>(5);
   const [fileType, setFileType] = useState<FileType>('pdf');
   const [extractedText, setExtractedText] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_PROMPT);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -59,6 +62,11 @@ export default function Home() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // プロンプト変更ハンドラー
+  const handlePromptChange = (prompt: string) => {
+    setCustomPrompt(prompt);
   };
 
   // ファイル選択ハンドラー
@@ -186,6 +194,11 @@ export default function Home() {
         });
         formData.append('numQuestions', numQuestions.toString());
         
+        // カスタムプロンプトがデフォルトと異なる場合のみ送信
+        if (customPrompt !== DEFAULT_PROMPT) {
+          formData.append('customPrompt', customPrompt);
+        }
+        
         const response = await fetch('/api/generate-questions', {
           method: 'POST',
           body: formData,
@@ -207,6 +220,11 @@ export default function Home() {
         const formData = new FormData();
         formData.append('extractedText', extractedTextContent);
         formData.append('numQuestions', numQuestions.toString());
+        
+        // カスタムプロンプトがデフォルトと異なる場合のみ送信
+        if (customPrompt !== DEFAULT_PROMPT) {
+          formData.append('customPrompt', customPrompt);
+        }
         
         const response = await fetch('/api/extract-text-from-image', {
           method: 'POST',
@@ -245,6 +263,19 @@ export default function Home() {
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <form onSubmit={handleSubmit}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* プロンプト編集セクション */}
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                プロンプト設定
+              </Typography>
+              <PromptEditor
+                onPromptChange={handlePromptChange}
+                defaultPrompt={DEFAULT_PROMPT}
+              />
+            </Box>
+
+            <Divider />
+
             <Box>
               <Box sx={{ width: '100%', mb: 3 }}>
                 <Tabs
