@@ -365,7 +365,7 @@ export default function Home() {
                 value={numQuestions}
                 onChange={handleNumQuestionsChange}
                 min={1}
-                max={10}
+                max={50}
                 step={1}
                 marks
                 valueLabelDisplay="auto"
