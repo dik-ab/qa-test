@@ -22,7 +22,9 @@ import {
   Stack,
   Tabs,
   Tab,
-  ButtonGroup
+  ButtonGroup,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -52,6 +54,7 @@ export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [numQuestions, setNumQuestions] = useState<number>(5);
+  const [comprehensiveMode, setComprehensiveMode] = useState<boolean>(false);
   const [fileType, setFileType] = useState<FileType>('pdf');
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_PROMPT);
@@ -211,6 +214,7 @@ export default function Home() {
           formData.append('files', file);
         });
         formData.append('numQuestions', numQuestions.toString());
+        formData.append('comprehensiveMode', comprehensiveMode.toString());
         
         // カスタムプロンプトがデフォルトと異なる場合のみ送信
         if (customPrompt !== DEFAULT_PROMPT) {
@@ -242,6 +246,7 @@ export default function Home() {
         const formData = new FormData();
         formData.append('extractedText', extractedTextContent);
         formData.append('numQuestions', numQuestions.toString());
+        formData.append('comprehensiveMode', comprehensiveMode.toString());
         
         // カスタムプロンプトがデフォルトと異なる場合のみ送信
         if (customPrompt !== DEFAULT_PROMPT) {
@@ -358,18 +363,52 @@ export default function Home() {
             </Box>
             
             <Box>
-              <Typography gutterBottom>
-                生成する質問数: {numQuestions}
+              <Typography variant="h6" gutterBottom>
+                質問生成設定
               </Typography>
-              <Slider
-                value={numQuestions}
-                onChange={handleNumQuestionsChange}
-                min={1}
-                max={50}
-                step={1}
-                marks
-                valueLabelDisplay="auto"
+              
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={comprehensiveMode}
+                    onChange={(e) => setComprehensiveMode(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body1" component="span">
+                      網羅的生成モード
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                      AIが文書を分析してユーザーが疑問に思うであろう箇所を自動判断し、細かい部分まで網羅的に質問を生成します。
+                      このモードでは指定した質問数よりも多くの質問が生成される場合があります。
+                    </Typography>
+                  </Box>
+                }
+                sx={{ alignItems: 'flex-start', mb: 2 }}
               />
+              
+              <Box sx={{ opacity: comprehensiveMode ? 0.5 : 1 }}>
+                <Typography gutterBottom>
+                  生成する質問数: {numQuestions}
+                  {comprehensiveMode && (
+                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                      （網羅的モードでは参考値として使用）
+                    </Typography>
+                  )}
+                </Typography>
+                <Slider
+                  value={numQuestions}
+                  onChange={handleNumQuestionsChange}
+                  min={1}
+                  max={50}
+                  step={1}
+                  marks
+                  valueLabelDisplay="auto"
+                  disabled={comprehensiveMode}
+                />
+              </Box>
             </Box>
             
             <Box>
