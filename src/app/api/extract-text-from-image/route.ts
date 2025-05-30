@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const extractedText = formData.get('extractedText') as string;
     const numQuestions = Number(formData.get('numQuestions') || 5);
+    const comprehensiveMode = formData.get('comprehensiveMode') === 'true';
     const customPrompt = formData.get('customPrompt') as string | null;
 
     if (!extractedText) {
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
     const questions = await generateQuestionsFromText(
       truncatedText, 
       numQuestions, 
-      customPrompt || undefined
+      customPrompt || undefined,
+      comprehensiveMode
     );
 
     return NextResponse.json({ questions });
