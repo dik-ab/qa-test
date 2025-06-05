@@ -32,6 +32,7 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import DownloadIcon from '@mui/icons-material/Download';
 import TableViewIcon from '@mui/icons-material/TableView';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import CompareIcon from '@mui/icons-material/Compare';
 import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
 import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
 import { downloadTextFile, generateTimestampedTextFilename, formatExtractedTextForDownload } from '@/utils/text';
@@ -42,6 +43,19 @@ import PromptEditor from '@/components/PromptEditor';
 interface Question {
   question: string;
   answer: string;
+}
+
+// 類似度チェック結果の型定義
+interface SimilarityResult {
+  similarPairs: Array<{
+    index1: number;
+    index2: number;
+    question1: string;
+    question2: string;
+    similarity: string;
+    reason: string;
+  }>;
+  summary: string;
 }
 
 // ファイルタイプの型定義
@@ -58,6 +72,8 @@ export default function Home() {
   const [fileType, setFileType] = useState<FileType>('pdf');
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_PROMPT);
+  const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
+  const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -281,6 +297,40 @@ export default function Home() {
     }
   };
 
+  // 類似度チェックハンドラー
+  const handleCheckSimilarity = async () => {
+    if (questions.length < 2) {
+      setError('類似度チェックには最低2つの質問が必要です');
+      return;
+    }
+
+    setIsSimilarityLoading(true);
+    setError(null);
+    setSimilarityResult(null);
+
+    try {
+      const response = await fetch('/api/check-similarity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ questions }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '類似度チェック中にエラーが発生しました');
+      }
+
+      const data = await response.json();
+      setSimilarityResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
+    } finally {
+      setIsSimilarityLoading(false);
+    }
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
@@ -466,20 +516,31 @@ export default function Home() {
             <Typography variant="h5">
               生成されたクエスチョンデータ
             </Typography>
-            <ButtonGroup variant="outlined" color="primary">
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              <ButtonGroup variant="outlined" color="primary">
+                <Button
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadCSV}
+                >
+                  CSV
+                </Button>
+                <Button
+                  startIcon={<TableViewIcon />}
+                  onClick={handleDownloadXLSX}
+                >
+                  XLSX
+                </Button>
+              </ButtonGroup>
               <Button
-                startIcon={<DownloadIcon />}
-                onClick={handleDownloadCSV}
+                variant="contained"
+                color="secondary"
+                startIcon={<CompareIcon />}
+                onClick={handleCheckSimilarity}
+                disabled={isSimilarityLoading || questions.length < 2}
               >
-                CSV
+                類似度チェック
               </Button>
-              <Button
-                startIcon={<TableViewIcon />}
-                onClick={handleDownloadXLSX}
-              >
-                XLSX
-              </Button>
-            </ButtonGroup>
+            </Stack>
           </Box>
           <Divider sx={{ mb: 2 }} />
           
@@ -497,6 +558,89 @@ export default function Home() {
               </AccordionDetails>
             </Accordion>
           ))}
+        </Paper>
+      )}
+
+      {isSimilarityLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+          <Typography variant="body1" sx={{ ml: 2 }}>
+            質問の類似度を分析中...
+          </Typography>
+        </Box>
+      )}
+
+      {similarityResult && (
+        <Paper elevation={3} sx={{ p: 3, mt: 4 }}>
+          <Typography variant="h5" gutterBottom>
+            類似度チェック結果
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          
+          {/* 全体的な分析結果 */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              分析サマリー
+            </Typography>
+            <Typography variant="body1" sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              {similarityResult.summary}
+            </Typography>
+          </Box>
+
+          {/* 類似している質問ペア */}
+          {similarityResult.similarPairs.length > 0 ? (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                類似している質問ペア ({similarityResult.similarPairs.length}組)
+              </Typography>
+              {similarityResult.similarPairs.map((pair, index) => (
+                <Accordion key={index} sx={{ mb: 1 }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography>
+                      <strong>ペア {index + 1}:</strong> Q{pair.index1} と Q{pair.index2} - {pair.similarity}
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box>
+                        <Typography variant="subtitle2" color="primary" gutterBottom>
+                          質問 {pair.index1}:
+                        </Typography>
+                        <Typography variant="body2" sx={{ p: 1, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+                          {pair.question1}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" color="primary" gutterBottom>
+                          質問 {pair.index2}:
+                        </Typography>
+                        <Typography variant="body2" sx={{ p: 1, bgcolor: '#e8f5e8', borderRadius: 1 }}>
+                          {pair.question2}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          類似度の理由:
+                        </Typography>
+                        <Typography variant="body2" sx={{ p: 1, bgcolor: '#fff3e0', borderRadius: 1 }}>
+                          {pair.reason}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              ))}
+            </Box>
+          ) : (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                類似している質問ペア
+              </Typography>
+              <Alert severity="info">
+                類似している質問ペアは見つかりませんでした。生成された質問は十分に多様性があります。
+              </Alert>
+            </Box>
+          )}
         </Paper>
       )}
       
