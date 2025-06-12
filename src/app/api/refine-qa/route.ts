@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { refineQAPair } from '@/utils/bedrock';
+import { refineQAWithDiff } from '@/utils/bedrock';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,32 +14,19 @@ export async function POST(request: NextRequest) {
 
     // 最初の20個だけを処理（エラー回避のため）
     const limitedQAData = qaData.slice(0, 20);
-    const refinedQAData = [];
 
     console.log(`処理対象: ${limitedQAData.length}件のQAデータ`);
 
-    for (let i = 0; i < limitedQAData.length; i++) {
-      const qa = limitedQAData[i];
-      
-      if (!qa.question || !qa.answer) {
-        console.log(`スキップ: ${i + 1}件目 - 質問または回答が空です`);
-        continue;
-      }
+    // 新しい統合関数を使用して精査と差分生成を実行
+    const result = await refineQAWithDiff(limitedQAData);
 
-      console.log(`処理中: ${i + 1}/${limitedQAData.length}件目`);
-      console.log(`質問: ${qa.question.substring(0, 50)}...`);
-      console.log(`回答: ${qa.answer.substring(0, 100)}...`);
-
-      // 各QAペアを個別に精査
-      const refinedResult = await refineQAPair(qa.question, qa.answer);
-      refinedQAData.push(refinedResult);
-    }
-
-    console.log(`精査完了: ${refinedQAData.length}件のQAデータを処理しました`);
+    console.log(`精査完了: ${result.refinedData.length}件のQAデータを処理しました`);
+    console.log(`差分レポート: ${result.diffReportPath}`);
 
     return NextResponse.json({
       success: true,
-      data: refinedQAData
+      data: result.refinedData,
+      diffReportPath: result.diffReportPath
     });
 
   } catch (error) {

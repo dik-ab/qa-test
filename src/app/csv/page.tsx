@@ -35,6 +35,7 @@ export default function CSVPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isRefining, setIsRefining] = useState(false);
+  const [diffReportPath, setDiffReportPath] = useState<string | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   // CSV読み込みハンドラー
@@ -99,6 +100,7 @@ export default function CSVPage() {
 
       const data = await response.json();
       setQuestions(data.data);
+      setDiffReportPath(data.diffReportPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
     } finally {
@@ -242,6 +244,21 @@ export default function CSVPage() {
       {error && (
         <Alert severity="error" sx={{ mb: 4 }}>
           {error}
+        </Alert>
+      )}
+
+      {/* 差分レポート表示 */}
+      {diffReportPath && (
+        <Alert severity="success" sx={{ mb: 4 }}>
+          <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+            QA精査が完了しました！
+          </Typography>
+          <Typography variant="body2">
+            精査前後の差分レポートが生成されました: <code>{diffReportPath}</code>
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            このMarkdownファイルには、変更されたQAペアの詳細な差分情報が含まれています。
+          </Typography>
         </Alert>
       )}
 
