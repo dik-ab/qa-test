@@ -1,4 +1,122 @@
 /**
+ * CSVファイルを解析してQAデータを抽出する
+ * @param csvContent CSV形式の文字列
+ * @returns 質問と回答のリスト
+ */
+export function parseCSVToQuestions(csvContent: string): Array<{ question: string, answer: string }> {
+  const questions: Array<{ question: string, answer: string }> = [];
+  
+  try {
+    // CSVを正しく解析（改行を含むフィールドに対応）
+    const rows = parseCSV(csvContent);
+    
+    // ヘッダー行をスキップして処理
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      
+      // docomo.csvの形式に合わせて質問と回答を抽出
+      // 列10が質問、列11が回答（0ベースなので9と10）
+      if (row.length >= 11 && row[9] && row[10]) {
+        const question = cleanText(row[9]);
+        const answer = cleanText(row[10]);
+        
+        if (question && answer) {
+          questions.push({
+            question: question,
+            answer: answer
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('CSV解析エラー:', error);
+  }
+  
+  return questions;
+}
+
+/**
+ * CSVコンテンツ全体を解析してレコードの配列を返す
+ * @param csvContent CSV形式の文字列
+ * @returns レコードの配列（各レコードはフィールドの配列）
+ */
+function parseCSV(csvContent: string): string[][] {
+  const records: string[][] = [];
+  let currentRecord: string[] = [];
+  let currentField = '';
+  let inQuotes = false;
+  let i = 0;
+  
+  while (i < csvContent.length) {
+    const char = csvContent[i];
+    const nextChar = csvContent[i + 1];
+    
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // エスケープされたダブルクォート
+        currentField += '"';
+        i += 2;
+      } else {
+        // クォートの開始または終了
+        inQuotes = !inQuotes;
+        i++;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // フィールドの区切り
+      currentRecord.push(currentField);
+      currentField = '';
+      i++;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      // レコードの区切り
+      currentRecord.push(currentField);
+      
+      // 空のレコードでなければ追加
+      if (currentRecord.some(field => field.trim() !== '')) {
+        records.push(currentRecord);
+      }
+      
+      currentRecord = [];
+      currentField = '';
+      
+      // \r\nの場合は次の文字もスキップ
+      if (char === '\r' && nextChar === '\n') {
+        i += 2;
+      } else {
+        i++;
+      }
+    } else {
+      currentField += char;
+      i++;
+    }
+  }
+  
+  // 最後のフィールドとレコードを追加
+  if (currentField || currentRecord.length > 0) {
+    currentRecord.push(currentField);
+    if (currentRecord.some(field => field.trim() !== '')) {
+      records.push(currentRecord);
+    }
+  }
+  
+  return records;
+}
+
+/**
+ * テキストをクリーンアップする
+ * @param text クリーンアップするテキスト
+ * @returns クリーンアップされたテキスト
+ */
+function cleanText(text: string): string {
+  if (!text) return '';
+  
+  return text
+    .trim()
+    .replace(/^\"|\"$/g, '') // 先頭と末尾のダブルクォートを削除
+    .replace(/\"\"/g, '"')   // エスケープされたダブルクォートを元に戻す
+    .trim();
+}
+
+/**
  * QAデータをCSV形式に変換する
  * @param questions 質問と回答のリスト
  * @returns CSV形式の文字列

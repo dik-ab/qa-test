@@ -333,9 +333,22 @@ export default function Home() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 2 }}>
         ファイルからクエスチョンデータ生成
       </Typography>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+        <Button
+          variant="outlined"
+          href="/csv"
+          sx={{ mr: 2 }}
+        >
+          CSVデータ精査ツール
+        </Button>
+        <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
+          既存のCSVファイルを精査する場合はこちら
+        </Typography>
+      </Box>
       
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <form onSubmit={handleSubmit}>
