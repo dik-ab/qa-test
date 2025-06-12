@@ -1,3 +1,5 @@
+import { DocomoCSVParser } from './csvParser';
+
 /**
  * CSVファイルを解析してQAデータを抽出する
  * @param csvContent CSV形式の文字列
@@ -7,25 +9,16 @@ export function parseCSVToQuestions(csvContent: string): Array<{ question: strin
   const questions: Array<{ question: string, answer: string }> = [];
   
   try {
-    // CSVを正しく解析（改行を含むフィールドに対応）
-    const rows = parseCSV(csvContent);
+    // DocomoCSVParserを使用してCSVを解析
+    const parsedData = DocomoCSVParser.parseCSV(csvContent);
     
-    // ヘッダー行をスキップして処理
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      
-      // docomo.csvの形式に合わせて質問と回答を抽出
-      // 列10が質問、列11が回答（0ベースなので9と10）
-      if (row.length >= 11 && row[9] && row[10]) {
-        const question = cleanText(row[9]);
-        const answer = cleanText(row[10]);
-        
-        if (question && answer) {
-          questions.push({
-            question: question,
-            answer: answer
-          });
-        }
+    // DocomoQADataから質問と回答を抽出
+    for (const item of parsedData) {
+      if (item.question && item.answer) {
+        questions.push({
+          question: item.question,
+          answer: item.answer
+        });
       }
     }
   } catch (error) {
