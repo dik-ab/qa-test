@@ -267,3 +267,95 @@ export async function generateQuestionsFromText(
     throw error;
   }
 }
+
+/**
+ * QAペアを精査・改善する
+ * @param question 元の質問文
+ * @param answer 元の回答文
+ * @returns 精査されたQAペア
+ */
+export async function refineQAPair(question: string, answer: string): Promise<{ question: string, answer: string }> {
+  console.log('called')
+  try {
+    const prompt = `
+質問と回答のペアを分析し、FAQサイトに適した形式に修正してください。
+
+【元の質問】
+${question}
+
+【元の回答】
+${answer}
+
+### 質問の精査：
+・質問文は変更しない（元の質問をそのまま使用する）
+
+### 回答の精査：
+・箇条書きを活用する（箇条書きには全角の「・」を用い、インデントには全角スペースを用いて「　・」「　　・」と表現する）
+
+## 出力形式：
+以下のJSON形式で返してください。JSONのみを返し、説明や追加のテキストは不要です：
+
+{
+  "question": "元の質問文をそのまま使用",
+  "answer": "箇条書き形式に修正された回答文"
+}
+`;
+    console.log('Prompt:', prompt);
+    // Bedrockへのリクエスト
+    const response = await bedrockClient.send(
+      new InvokeModelCommand({
+        modelId: MODEL_ID,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          max_tokens: 4096,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: prompt
+                }
+              ]
+            }
+          ]
+        }),
+      })
+    );
+    
+    // レスポンスの解析
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const responseText = responseBody.content[0].text;
+
+    console.log('Response from Bedrock:', responseText);
+    
+    // JSONの抽出（余分なテキストがある場合に対応）
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        question: parsed.question || question,
+        answer: parsed.answer || answer
+      };
+    }
+    
+    // 直接JSONとして解析できる場合
+    try {
+      const parsed = JSON.parse(responseText);
+      return {
+        question: parsed.question || question,
+        answer: parsed.answer || answer
+      };
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      // パースに失敗した場合は元のデータを返す
+      return { question, answer };
+    }
+  } catch (error) {
+    console.error('Error refining QA pair:', error);
+    // エラーの場合は元のデータを返す
+    return { question, answer };
+  }
+}
