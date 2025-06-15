@@ -1,5 +1,7 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { config } from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // 開発環境でのみdotenvを読み込む
 if (process.env.NODE_ENV !== 'production') {
@@ -265,5 +267,280 @@ export async function generateQuestionsFromText(
   } catch (error) {
     console.error('Error generating questions:', error);
     throw error;
+  }
+}
+
+/**
+ * QAペアの差分を生成する
+ * @param originalQA 精査前のQAデータ
+ * @param refinedQA 精査後のQAデータ
+ * @returns 差分情報
+ */
+export function generateQADiff(
+  originalQA: Array<{ question: string, answer: string }>,
+  refinedQA: Array<{ question: string, answer: string }>
+): Array<{
+  index: number;
+  question: {
+    original: string;
+    refined: string;
+    changed: boolean;
+  };
+  answer: {
+    original: string;
+    refined: string;
+    changed: boolean;
+  };
+}> {
+  const diffs = [];
+  const maxLength = Math.max(originalQA.length, refinedQA.length);
+
+  for (let i = 0; i < maxLength; i++) {
+    const original = originalQA[i] || { question: '', answer: '' };
+    const refined = refinedQA[i] || { question: '', answer: '' };
+
+    const questionChanged = original.question !== refined.question;
+    const answerChanged = original.answer !== refined.answer;
+
+    diffs.push({
+      index: i + 1,
+      question: {
+        original: original.question,
+        refined: refined.question,
+        changed: questionChanged
+      },
+      answer: {
+        original: original.answer,
+        refined: refined.answer,
+        changed: answerChanged
+      }
+    });
+  }
+
+  return diffs;
+}
+
+/**
+ * 差分をMarkdownファイルに出力する
+ * @param diffs 差分データ
+ * @param outputPath 出力ファイルパス（オプション）
+ * @returns 生成されたMarkdownファイルのパス
+ */
+export function generateDiffMarkdown(
+  diffs: Array<{
+    index: number;
+    question: {
+      original: string;
+      refined: string;
+      changed: boolean;
+    };
+    answer: {
+      original: string;
+      refined: string;
+      changed: boolean;
+    };
+  }>,
+  outputPath?: string
+): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = outputPath || `qa_diff_${timestamp}.md`;
+  const filepath = path.resolve(filename);
+
+  let markdown = `# QA精査差分レポート\n\n`;
+  markdown += `生成日時: ${new Date().toLocaleString('ja-JP')}\n\n`;
+  
+  // 変更があったQAペアの数をカウント
+  const changedCount = diffs.filter(diff => diff.question.changed || diff.answer.changed).length;
+  markdown += `## 概要\n\n`;
+  markdown += `- 総QAペア数: ${diffs.length}\n`;
+  markdown += `- 変更があったQAペア数: ${changedCount}\n`;
+  markdown += `- 変更なしのQAペア数: ${diffs.length - changedCount}\n\n`;
+
+  // 変更があったQAペアのみを表示
+  const changedDiffs = diffs.filter(diff => diff.question.changed || diff.answer.changed);
+  
+  if (changedDiffs.length === 0) {
+    markdown += `## 結果\n\n変更されたQAペアはありませんでした。\n`;
+  } else {
+    markdown += `## 変更されたQAペア\n\n`;
+    
+    changedDiffs.forEach((diff, index) => {
+      markdown += `### ${index + 1}. QAペア #${diff.index}\n\n`;
+      
+      if (diff.question.changed) {
+        markdown += `#### 質問の変更\n\n`;
+        markdown += `**変更前:**\n`;
+        markdown += `> ${diff.question.original}\n\n`;
+        markdown += `**変更後:**\n`;
+        markdown += `> ${diff.question.refined}\n\n`;
+      } else {
+        markdown += `#### 質問（変更なし）\n\n`;
+        markdown += `> ${diff.question.original}\n\n`;
+      }
+      
+      if (diff.answer.changed) {
+        markdown += `#### 回答の変更\n\n`;
+        markdown += `**変更前:**\n`;
+        markdown += `\`\`\`\n${diff.answer.original}\n\`\`\`\n\n`;
+        markdown += `**変更後:**\n`;
+        markdown += `\`\`\`\n${diff.answer.refined}\n\`\`\`\n\n`;
+      } else {
+        markdown += `#### 回答（変更なし）\n\n`;
+        markdown += `\`\`\`\n${diff.answer.original}\n\`\`\`\n\n`;
+      }
+      
+      markdown += `---\n\n`;
+    });
+  }
+
+  // ファイルに書き込み
+  fs.writeFileSync(filepath, markdown, 'utf8');
+  console.log(`差分レポートを生成しました: ${filepath}`);
+  
+  return filepath;
+}
+
+/**
+ * QA精査処理と差分生成を統合した関数
+ * @param originalQAData 精査前のQAデータ
+ * @returns 精査後のQAデータと差分レポートのパス
+ */
+export async function refineQAWithDiff(
+  originalQAData: Array<{ question: string, answer: string }>
+): Promise<{
+  refinedData: Array<{ question: string, answer: string }>;
+  diffReportPath: string;
+}> {
+  console.log(`QA精査処理を開始: ${originalQAData.length}件のQAデータ`);
+  
+  const refinedQAData = [];
+  
+  // 各QAペアを個別に精査
+  for (let i = 0; i < originalQAData.length; i++) {
+    const qa = originalQAData[i];
+    
+    if (!qa.question || !qa.answer) {
+      console.log(`スキップ: ${i + 1}件目 - 質問または回答が空です`);
+      refinedQAData.push(qa); // 元のデータをそのまま追加
+      continue;
+    }
+
+    console.log(`処理中: ${i + 1}/${originalQAData.length}件目`);
+    
+    try {
+      const refinedResult = await refineQAPair(qa.question, qa.answer);
+      refinedQAData.push(refinedResult);
+    } catch (error) {
+      console.error(`エラー: ${i + 1}件目の処理中にエラーが発生しました:`, error);
+      refinedQAData.push(qa); // エラーの場合は元のデータを使用
+    }
+  }
+
+  // 差分を生成
+  const diffs = generateQADiff(originalQAData, refinedQAData);
+  
+  // Markdownレポートを生成
+  const diffReportPath = generateDiffMarkdown(diffs);
+  
+  console.log(`QA精査処理完了: ${refinedQAData.length}件のQAデータを処理しました`);
+  
+  return {
+    refinedData: refinedQAData,
+    diffReportPath
+  };
+}
+
+/**
+ * QAペアを精査・改善する
+ * @param question 元の質問文
+ * @param answer 元の回答文
+ * @returns 精査されたQAペア
+ */
+export async function refineQAPair(question: string, answer: string): Promise<{ question: string, answer: string }> {
+  console.log('called')
+  try {
+    const prompt = `
+質問と回答のペアを分析し、FAQサイトに適した形式に修正してください。
+
+【元の質問】
+${question}
+
+【元の回答】
+${answer}
+
+FAQ情報を共有するので、RAG検索を行った際のマッチ度が高くなるような「質問：回答」のデータに整形してください。
+データを作成する際は、以下のポイントを守ってください
+1.RAG検索に当たりやすいデータを作成するためのポイント
+・シンプルな言葉を用いる
+・重要なワードを分類、強調する
+・箇条書きを活用する（箇条書きには全角の「・」を用い、インデントには全角スペースを用いて「　・」「　　・」と表現する）
+・リンクとそのリンクの文章は必ず保持し、リンクのURLは<a href="URL">リンク名</a>の形式で表現する
+
+
+## 出力形式：
+以下のJSON形式で返してください。JSONのみを返し、説明や追加のテキストは不要です：
+
+{
+  "question": "元の質問文をそのまま使用",
+  "answer": "修正された回答文"
+}
+`;
+    console.log('Prompt:', prompt);
+    // Bedrockへのリクエスト
+    const response = await bedrockClient.send(
+      new InvokeModelCommand({
+        modelId: MODEL_ID,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          max_tokens: 4096,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: prompt
+                }
+              ]
+            }
+          ]
+        }),
+      })
+    );
+    
+    // レスポンスの解析
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const responseText = responseBody.content[0].text;
+
+    console.log('Response from Bedrock:', responseText);
+    
+    // JSONの抽出（余分なテキストがある場合に対応）
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        question: parsed.question || question,
+        answer: parsed.answer || answer
+      };
+    }
+    
+    // 直接JSONとして解析できる場合
+    try {
+      const parsed = JSON.parse(responseText);
+      return {
+        question: parsed.question || question,
+        answer: parsed.answer || answer
+      };
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      // パースに失敗した場合は元のデータを返す
+      return { question, answer };
+    }
+  } catch (error) {
+    console.error('Error refining QA pair:', error);
+    // エラーの場合は元のデータを返す
+    return { question, answer };
   }
 }
