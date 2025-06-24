@@ -337,16 +337,24 @@ export default function Home() {
         ファイルからクエスチョンデータ生成
       </Typography>
       
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-        <Button
-          variant="outlined"
-          href="/csv"
-          sx={{ mr: 2 }}
-        >
-          CSVデータ精査ツール
-        </Button>
-        <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
-          既存のCSVファイルを精査する場合はこちら
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4, flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Button
+            variant="outlined"
+            href="/csv"
+          >
+            CSVデータ精査ツール
+          </Button>
+          <Button
+            variant="outlined"
+            href="/customer-situation"
+            color="primary"
+          >
+            顧客の状況推測ツール
+          </Button>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          既存のCSVファイルを精査する場合や、FAQデータから顧客の状況を推測する場合はこちら
         </Typography>
       </Box>
       

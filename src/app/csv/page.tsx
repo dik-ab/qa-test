@@ -124,6 +124,7 @@ export default function CSVPage() {
     }
   };
 
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* パンくずリスト */}
@@ -150,6 +151,7 @@ export default function CSVPage() {
       <Typography variant="h6" color="text.secondary" align="center" sx={{ mb: 4 }}>
         CSVファイルからQAデータを読み込んで、粒度を揃える精査を行います
       </Typography>
+
 
       {/* CSV読み込みとQA精査セクション */}
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
