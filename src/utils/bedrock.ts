@@ -392,6 +392,75 @@ export function generateDiffMarkdown(
 }
 
 /**
+ * 質問と回答から顧客の状況を推測する
+ * @param question 質問文
+ * @param answer 回答文
+ * @returns 推測された顧客の状況
+ */
+export async function generateCustomerSituation(
+  question: string,
+  answer: string
+): Promise<string> {
+  try {
+    const prompt = `
+FAQデータを[質問]と[回答]のセットで共有するので、この回答で課題が解決するお客様は今どのような状況に置かれているかを推測し、"[理由]により、[特定のサービスなど]が[起きている事象]"という書き方で箇条書きで出力してください。
+
+【質問】
+${question}
+
+【回答】
+${answer}
+
+出力例：機種変更をしたことにより、dポイントクラブアプリが端末から消えてしまい、dポイントの残高を確認できなくなってしまった。
+
+出力例を参考にしながら、以下のポイントを守って出力してください。
+・指示に記載されている[]は出力に含めないでください
+・[理由]と[起きている事象]は詳細に出力してください
+・出力は推定したお客様の状況の箇条書きのみとしてください
+・お客様の状況は質問の内容と矛盾しないようにしてください
+・箇条書きは1つから最大2つまでとし、内容が重複しないようにしてください
+・箇条書きの記号は「・」を使用してください
+・質問や回答に記載の無い憶測での出力はしないでください
+
+出力は推測した顧客の状況の箇条書きのみを返してください。説明や追加のテキストは不要です。
+`;
+
+    // Bedrockへのリクエスト
+    const response = await bedrockClient.send(
+      new InvokeModelCommand({
+        modelId: MODEL_ID,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: prompt
+                }
+              ]
+            }
+          ]
+        }),
+      })
+    );
+    
+    // レスポンスの解析
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const responseText = responseBody.content[0].text;
+    
+    return responseText.trim();
+  } catch (error) {
+    console.error('Error generating customer situation:', error);
+    return '';
+  }
+}
+
+/**
  * QA精査処理と差分生成を統合した関数
  * @param originalQAData 精査前のQAデータ
  * @returns 精査後のQAデータと差分レポートのパス
