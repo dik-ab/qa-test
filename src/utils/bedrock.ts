@@ -1,7 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { config } from 'dotenv';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // 開発環境でのみdotenvを読み込む
 if (process.env.NODE_ENV !== 'production') {
@@ -341,10 +339,9 @@ export function generateDiffMarkdown(
     };
   }>,
   outputPath?: string
-): string {
+): any {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = outputPath || `qa_diff_${timestamp}.md`;
-  const filepath = path.resolve(filename);
 
   let markdown = `# QA精査差分レポート\n\n`;
   markdown += `生成日時: ${new Date().toLocaleString('ja-JP')}\n\n`;
@@ -392,12 +389,6 @@ export function generateDiffMarkdown(
       markdown += `---\n\n`;
     });
   }
-
-  // ファイルに書き込み
-  fs.writeFileSync(filepath, markdown, 'utf8');
-  console.log(`差分レポートを生成しました: ${filepath}`);
-  
-  return filepath;
 }
 
 /**
