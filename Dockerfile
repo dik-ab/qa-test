@@ -3,7 +3,7 @@ FROM node:18-alpine AS base
 
 # 依存関係のインストール用ステージ
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat poppler-utils
 WORKDIR /app
 
 # package.jsonとpackage-lock.jsonをコピー
@@ -25,6 +25,9 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
+# poppler-utilsをインストール（pdftotext用）
+RUN apk add --no-cache poppler-utils
+
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
@@ -37,6 +40,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+
+# tempディレクトリを作成し、nextjsユーザーに権限を付与
+RUN mkdir -p /app/public/temp && chown -R nextjs:nodejs /app/public/temp
 
 USER nextjs
 
