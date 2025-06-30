@@ -53,7 +53,7 @@ resource "aws_iam_policy" "bedrock_access" {
           "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
-          "arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+          "*"
         ]
       }
     ]
