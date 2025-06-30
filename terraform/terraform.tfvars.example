@@ -1,0 +1,49 @@
+# AWS設定
+aws_region = "us-east-1"
+
+# アプリケーション設定
+app_name = "qamatching-app"
+
+# GitHub設定（必須）
+github_repository_url = "https://github.com/your-username/your-repository"
+github_branch         = "main"
+
+# 自動デプロイ設定
+auto_deployments_enabled = true
+
+# インスタンス設定
+cpu    = "0.25 vCPU"  # 0.25 vCPU, 0.5 vCPU, 1 vCPU, 2 vCPU, 4 vCPU
+memory = "0.5 GB"     # 0.5 GB, 1 GB, 2 GB, 3 GB, 4 GB, 6 GB, 8 GB, 10 GB, 12 GB
+
+# オートスケーリング設定
+max_concurrency = 100  # 1-1000
+max_size        = 10   # 1-1000
+min_size        = 1    # 1-1000
+
+# 環境変数
+environment_variables = {
+  NODE_ENV   = "production"
+  AWS_REGION = "us-east-1"
+  PORT       = "3000"
+}
+
+# 環境シークレット（必要に応じて）
+# environment_secrets = {
+#   DATABASE_URL = "your-secret-value"
+# }
+
+# ヘルスチェック設定
+health_check_healthy_threshold   = 1   # 1-20
+health_check_interval           = 10   # 5-20 seconds
+health_check_path              = "/"
+health_check_protocol          = "HTTP"  # HTTP or TCP
+health_check_timeout           = 2     # 1-20 seconds
+health_check_unhealthy_threshold = 5   # 1-20
+
+# タグ
+tags = {
+  Environment = "production"
+  Project     = "qamatching"
+  ManagedBy   = "terraform"
+  Owner       = "your-name"
+}

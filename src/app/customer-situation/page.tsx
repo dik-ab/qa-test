@@ -13,7 +13,6 @@ import {
   Link,
 } from '@mui/material';
 import PsychologyIcon from '@mui/icons-material/Psychology';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
 import HomeIcon from '@mui/icons-material/Home';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
