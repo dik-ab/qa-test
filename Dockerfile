@@ -8,7 +8,7 @@ WORKDIR /app
 
 # package.jsonとpackage-lock.jsonをコピー
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+RUN npm ci
 
 # ビルド用ステージ
 FROM base AS builder
@@ -34,13 +34,9 @@ RUN adduser --system --uid 1001 nextjs
 
 # 必要なファイルをコピー
 COPY --from=builder /app/public ./public
-
-# ビルド出力をコピー
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# 本番用依存関係をコピー
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
 USER nextjs
 
@@ -49,5 +45,5 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# アプリケーションを起動
-CMD ["node", "server.js"]
+# npm run startでアプリケーションを起動
+CMD ["npm", "run", "start"]
