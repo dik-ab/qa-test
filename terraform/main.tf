@@ -153,17 +153,17 @@ resource "aws_apprunner_service" "main" {
 
   source_configuration {
     auto_deployments_enabled = var.auto_deployments_enabled
-    
+
     image_repository {
-      image_identifier      = "${aws_ecr_repository.main.repository_url}:latest"
+      image_identifier = "${aws_ecr_repository.main.repository_url}:latest"
       image_configuration {
         port                          = "3000"
         runtime_environment_variables = var.environment_variables
-        runtime_environment_secrets  = var.environment_secrets
+        runtime_environment_secrets   = var.environment_secrets
       }
       image_repository_type = "ECR"
     }
-    
+
     authentication_configuration {
       access_role_arn = aws_iam_role.apprunner_access_role.arn
     }
