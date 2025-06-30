@@ -348,7 +348,6 @@ export function generateDiffMarkdown(
   outputPath?: string
 ): any {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const filename = outputPath || `qa_diff_${timestamp}.md`;
 
   let markdown = `# QA精査差分レポート\n\n`;
   markdown += `生成日時: ${new Date().toLocaleString('ja-JP')}\n\n`;

@@ -66,7 +66,7 @@ export default function CSVPage() {
         if (csvInputRef.current) {
           csvInputRef.current.value = '';
         }
-      } catch (err) {
+      } catch {
         setError('CSVファイルの読み込み中にエラーが発生しました');
       }
     };
@@ -119,10 +119,10 @@ export default function CSVPage() {
       const csvContent = convertQuestionsToCSV(questions);
       const filename = generateTimestampedFilename('refined_qa_data');
       downloadCSV(csvContent, filename);
-    } catch (err) {
+    } catch {
       setError('CSVファイルの生成中にエラーが発生しました');
     }
-  };
+};
 
 
   return (
