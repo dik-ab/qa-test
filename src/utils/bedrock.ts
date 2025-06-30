@@ -8,11 +8,18 @@ if (process.env.NODE_ENV !== 'production') {
 
 // AWS Bedrock クライアントの初期化
 const bedrockClient = new BedrockRuntimeClient({
-  region: 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
+  region: process.env.AWS_REGION || 'us-east-1',
+  // 本番環境（App Runner）ではインスタンスロールを使用
+  // ローカル開発環境では環境変数から認証情報を取得
+  ...(process.env.NODE_ENV === 'production' 
+    ? {} // インスタンスロールを使用（認証情報を明示的に指定しない）
+    : {
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        },
+      }
+  ),
 });
 
 // Claude 3.5 Sonnet モデルID
