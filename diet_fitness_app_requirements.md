@@ -48,18 +48,35 @@
 ```mermaid
 graph TB
     A[ユーザー<br/>モバイル/Web] --> B[CloudFront<br/>CDN]
-    B --> C[AWS App Runner<br/>アプリケーション]
-    C --> D[Amazon RDS<br/>PostgreSQL]
-    C --> E[Amazon S3<br/>画像ストレージ]
-    C --> F[Amazon SES<br/>メール通知]
+    B --> C{Route 53<br/>DNS}
     
-    subgraph "AWS App Runner"
-        C1[Next.js Application]
-        C2[API Routes]
+    C --> D[東京リージョン<br/>ap-northeast-1]
+    C --> E[大阪リージョン<br/>ap-northeast-3]
+    
+    subgraph "東京リージョン（Primary）"
+        D1[AWS App Runner<br/>アプリケーション]
+        D2[Amazon RDS<br/>PostgreSQL Primary]
+        D3[Amazon S3<br/>画像ストレージ]
+        D4[Amazon SES<br/>メール通知]
+        
+        D --> D1
+        D1 --> D2
+        D1 --> D3
+        D1 --> D4
     end
     
-    C --> C1
-    C --> C2
+    subgraph "大阪リージョン（Secondary）"
+        E1[AWS App Runner<br/>アプリケーション]
+        E2[Amazon RDS<br/>PostgreSQL Read Replica]
+        E3[Amazon S3<br/>画像ストレージ<br/>Cross-Region Replication]
+        
+        E --> E1
+        E1 --> E2
+        E1 --> E3
+    end
+    
+    D2 -.->|レプリケーション| E2
+    D3 -.->|レプリケーション| E3
 ```
 
 ### 4.3 主要フロー図
@@ -307,4 +324,27 @@ flowchart TD
 ```
 
 ## 7. 運用保守（可用性の条件）
-<!-- システムの可用性要件、保守運用方針、障害対応などを記載 -->
+
+### 7.1 システム稼働時間
+- **稼働時間**: 24時間無停止運用
+- **計画停止**: 計画停止無し
+- **目標可用性**: 99.999%
+
+### 7.2 可用性保証の業務範囲と条件
+- **対象業務**: 外部向けオンライン系業務（全機能）
+- **復旧時間**: 60秒未満
+- **冗長化対応**: 二重障害時でもサービス切替時間の規定内で継続
+
+### 7.3 障害復旧目標（RTO/RPO）
+- **復旧時点目標（RPO）**: 障害発生時点（日次バックアップ+アーカイブログからの復旧）
+- **復旧時間目標（RTO）**: 2時間以内
+- **業務再開範囲**: 全ての業務機能
+- **完全復旧期限**: 3日以内
+
+### 7.4 運用保守体制
+- **監視体制**: 24時間365日システム監視
+- **障害対応**: 即座にエスカレーション体制を発動
+- **バックアップ**: 日次自動バックアップ + リアルタイムアーカイブログ
+- **災害対策**: 東京・大阪2リージョン構成による冗長化
+- **フェイルオーバー**: Route 53ヘルスチェックによる自動切り替え
+- **データ同期**: RDSクロスリージョンレプリケーション + S3クロスリージョンレプリケーション
