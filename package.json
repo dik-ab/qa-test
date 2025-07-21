@@ -9,12 +9,14 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test-csv": "node test-csv.js"
+    "test-csv": "node test-csv.js",
+    "test-document-ai": "node test-document-ai.js"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.810.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@google-cloud/documentai": "^9.3.0",
     "@mui/icons-material": "^7.1.0",
     "@mui/material": "^7.1.0",
     "dotenv": "^16.5.0",
