@@ -55,8 +55,8 @@ COPY --from=builder /app/package.json ./package.json
 # Google Cloud Document AIのサービスアカウントキーファイルは環境変数で管理
 # セキュリティのため、キーファイルはDockerイメージに含めない
 
-# tempディレクトリを作成し、nextjsユーザーに権限を付与
-RUN mkdir -p /app/public/temp && chown -R nextjs:nodejs /app/public/temp
+# 一時ファイル用のディレクトリを作成し、nextjsユーザーに権限を付与
+RUN mkdir -p /tmp/pdf-processing && chown -R nextjs:nodejs /tmp/pdf-processing
 
 USER nextjs
 
