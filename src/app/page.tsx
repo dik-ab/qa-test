@@ -33,6 +33,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import TableViewIcon from '@mui/icons-material/TableView';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import CompareIcon from '@mui/icons-material/Compare';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import LinkIcon from '@mui/icons-material/Link';
 import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
 import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
 import { downloadTextFile, generateTimestampedTextFilename, formatExtractedTextForDownload } from '@/utils/text';
@@ -43,6 +45,13 @@ import PromptEditor from '@/components/PromptEditor';
 interface Question {
   question: string;
   answer: string;
+}
+
+// API レスポンスの型定義
+interface GenerateQuestionsResponse {
+  questions: Question[];
+  extractedText?: string;
+  savedPdfPaths?: string[];
 }
 
 // 類似度チェック結果の型定義
@@ -74,6 +83,7 @@ export default function Home() {
   const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_PROMPT);
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
+  const [savedPdfPaths, setSavedPdfPaths] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -252,6 +262,10 @@ export default function Home() {
         // PDFからも抽出されたテキストを設定
         if (data.extractedText) {
           setExtractedText(data.extractedText);
+        }
+        // 保存されたPDFファイルのパスを設定
+        if (data.savedPdfPaths) {
+          setSavedPdfPaths(data.savedPdfPaths);
         }
       } else {
         // 画像ファイルの場合はクライアントサイドでテキスト抽出
@@ -509,6 +523,52 @@ export default function Home() {
         </Box>
       )}
       
+      {savedPdfPaths.length > 0 && (
+        <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <Typography variant="h5">
+              保存されたPDFファイル
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {savedPdfPaths.length}個のファイルが保存されました
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <List>
+            {savedPdfPaths.map((pdfPath, index) => {
+              const filename = pdfPath.split('/').pop() || `PDF ${index + 1}`;
+              return (
+                <ListItem key={index} sx={{ px: 0 }}>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PictureAsPdfIcon color="error" />
+                        <Typography variant="body1">
+                          {filename}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={
+                      <Button
+                        variant="text"
+                        size="small"
+                        startIcon={<LinkIcon />}
+                        href={pdfPath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ mt: 1, p: 0, minWidth: 'auto' }}
+                      >
+                        PDFを開く
+                      </Button>
+                    }
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+        </Paper>
+      )}
+
       {extractedText && (
         <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
