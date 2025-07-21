@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { savePdfsAndExtractTextWithFallback } from '@/utils/pdf';
+import { extractTextFromMultiplePdfsWithFallback } from '@/utils/pdf';
 import { generateQuestionsFromText } from '@/utils/bedrock';
 
 export const maxDuration = 60; // 60秒のタイムアウト（Vercel hobbyプランの上限）
@@ -29,8 +29,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PDFをpublicフォルダに保存してテキストを抽出（Document AI優先、フォールバック付き）
-    const { texts: extractedText, savedPaths } = await savePdfsAndExtractTextWithFallback(files);
+    // PDFからテキストを抽出（Document AI優先、フォールバック付き）
+    // ファイル保存は行わず、テキスト抽出のみ実行
+    const extractedText = await extractTextFromMultiplePdfsWithFallback(files);
 
     // テキストが長すぎる場合は切り詰める（Claudeのコンテキストウィンドウに収まるように）
     const maxTextLength = 100000; // 適切な長さに調整
@@ -48,8 +49,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       questions, 
-      extractedText,
-      savedPdfPaths: savedPaths // 保存されたPDFファイルのパスも返す
+      extractedText
+      // savedPdfPathsは削除（ファイル保存を行わないため）
     });
   } catch (error) {
     console.error('Error processing PDFs:', error);

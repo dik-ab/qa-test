@@ -83,7 +83,6 @@ export default function Home() {
   const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_PROMPT);
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
-  const [savedPdfPaths, setSavedPdfPaths] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -263,10 +262,7 @@ export default function Home() {
         if (data.extractedText) {
           setExtractedText(data.extractedText);
         }
-        // 保存されたPDFファイルのパスを設定
-        if (data.savedPdfPaths) {
-          setSavedPdfPaths(data.savedPdfPaths);
-        }
+        // PDFファイルの保存は行わないため、savedPdfPathsの処理は削除
       } else {
         // 画像ファイルの場合はクライアントサイドでテキスト抽出
         const extractedTextContent = await extractTextFromMultipleImages(files);
@@ -523,51 +519,7 @@ export default function Home() {
         </Box>
       )}
       
-      {savedPdfPaths.length > 0 && (
-        <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-            <Typography variant="h5">
-              保存されたPDFファイル
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {savedPdfPaths.length}個のファイルが保存されました
-            </Typography>
-          </Box>
-          <Divider sx={{ mb: 2 }} />
-          <List>
-            {savedPdfPaths.map((pdfPath, index) => {
-              const filename = pdfPath.split('/').pop() || `PDF ${index + 1}`;
-              return (
-                <ListItem key={index} sx={{ px: 0 }}>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PictureAsPdfIcon color="error" />
-                        <Typography variant="body1">
-                          {filename}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <Button
-                        variant="text"
-                        size="small"
-                        startIcon={<LinkIcon />}
-                        href={pdfPath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ mt: 1, p: 0, minWidth: 'auto' }}
-                      >
-                        PDFを開く
-                      </Button>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
-          </List>
-        </Paper>
-      )}
+      {/* PDFファイル保存機能は削除されたため、この表示部分も削除 */}
 
       {extractedText && (
         <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
