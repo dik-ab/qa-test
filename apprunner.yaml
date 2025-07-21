@@ -20,3 +20,5 @@ run:
       value: us-east-1
     - name: PORT
       value: "3000"
+    # Google Cloud Document AI環境変数はDockerイメージのbuild時に設定される
+    # GOOGLE_SERVICE_ACCOUNT_KEY, GOOGLE_CLOUD_PROJECT_ID, DOCUMENT_AI_LOCATION, DOCUMENT_AI_PROCESSOR_ID
