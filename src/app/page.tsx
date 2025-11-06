@@ -43,6 +43,8 @@ import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
 import { downloadTextFile, generateTimestampedTextFilename, formatExtractedTextForDownload } from '@/utils/text';
 import PromptEditor from '@/components/PromptEditor';
 import { DocumentType, DOCUMENT_TYPE_OPTIONS, DOCUMENT_TYPE_PROMPTS } from '@/utils/document-type-prompts';
+import { GenerationMode } from '@/utils/flexible-generation';
+import { DEFAULT_TE_QUESTION_PROMPT, DEFAULT_TE_ANSWER_PROMPT } from '@/utils/te-prompts';
 
 // 質問と回答の型定義
 interface Question {
@@ -89,7 +91,14 @@ export default function Home() {
   const [documentType, setDocumentType] = useState<DocumentType>('general');
   const [enableValidation, setEnableValidation] = useState<boolean>(true);
   const [enableTwoStageGeneration, setEnableTwoStageGeneration] = useState<boolean>(false);
+  const [generationMode, setGenerationMode] = useState<GenerationMode>('both');
+  const [useTE, setUseTE] = useState<boolean>(false);
+  const [teQuestionPrompt, setTeQuestionPrompt] = useState<string>(DEFAULT_TE_QUESTION_PROMPT);
+  const [teAnswerPrompt, setTeAnswerPrompt] = useState<string>(DEFAULT_TE_ANSWER_PROMPT);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
   const handleFileTypeChange = (_event: React.SyntheticEvent, newValue: FileType) => {
@@ -210,6 +219,12 @@ export default function Home() {
       return;
     }
     
+    // TE回答のみ生成モードの場合、CSVファイルが必要
+    if (useTE && generationMode === 'answers_only' && existingQuestions.length === 0) {
+      setError('回答のみ生成モードでは、CSVファイルをアップロードしてください');
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     setExtractedText(null);
@@ -226,6 +241,19 @@ export default function Home() {
       formData.append('documentType', documentType);
       formData.append('enableValidation', enableValidation.toString());
       formData.append('enableTwoStageGeneration', enableTwoStageGeneration.toString());
+      formData.append('generationMode', generationMode);
+      formData.append('useTE', useTE.toString());
+      
+      // TE用プロンプトの送信
+      if (useTE) {
+        formData.append('teQuestionPrompt', teQuestionPrompt);
+        formData.append('teAnswerPrompt', teAnswerPrompt);
+        
+        // 回答のみ生成モードの場合、既存の質問を送信
+        if (generationMode === 'answers_only' && existingQuestions.length > 0) {
+          formData.append('existingQuestions', JSON.stringify(existingQuestions));
+        }
+      }
       
       // カスタムプロンプトが現在のドキュメントタイプのデフォルトと異なる場合のみ送信
       if (customPrompt !== DOCUMENT_TYPE_PROMPTS[documentType]) {
@@ -260,6 +288,53 @@ export default function Home() {
     setFiles([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // CSVファイルの処理ハンドラー
+  const handleCsvFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        setError('CSVファイルのみアップロードできます');
+        return;
+      }
+      
+      setCsvFile(file);
+      
+      try {
+        const text = await file.text();
+        const lines = text.split('\n').filter(line => line.trim());
+        const parsedQuestions: Question[] = [];
+        
+        // ヘッダー行をスキップして処理
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          // CSVの各行をパース（カンマ区切りで、引用符内のカンマは無視）
+          const match = line.match(/(?:^|,)("(?:[^"]+|"")*"|[^,]*)/g);
+          if (match && match.length >= 2) {
+            const question = match[0].replace(/^,|^"|"$/g, '').replace(/""/g, '"').trim();
+            const answer = match[1].replace(/^,|^"|"$/g, '').replace(/""/g, '"').trim();
+            if (question) {
+              parsedQuestions.push({ question, answer });
+            }
+          }
+        }
+        
+        if (parsedQuestions.length === 0) {
+          setError('CSVファイルから質問を読み込めませんでした');
+          setCsvFile(null);
+          return;
+        }
+        
+        setExistingQuestions(parsedQuestions);
+        setError(null);
+      } catch (err) {
+        setError('CSVファイルの読み込み中にエラーが発生しました');
+        setCsvFile(null);
+        setExistingQuestions([]);
+      }
     }
   };
 
@@ -335,39 +410,161 @@ export default function Home() {
                     ドキュメント種別
                   </Typography>
                 </FormLabel>
-                <RadioGroup
-                  row
-                  value={documentType}
-                  onChange={handleDocumentTypeChange}
-                  sx={{ mt: 1, mb: 2 }}
-                >
-                  {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                    <FormControlLabel
-                      key={option.value}
-                      value={option.value}
-                      control={<Radio />}
-                      label={option.label}
-                    />
-                  ))}
-                </RadioGroup>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <RadioGroup
+                    row
+                    value={documentType}
+                    onChange={handleDocumentTypeChange}
+                    sx={{ mt: 1, mb: 2 }}
+                  >
+                    {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                      <FormControlLabel
+                        key={option.value}
+                        value={option.value}
+                        control={<Radio />}
+                        label={option.label}
+                      />
+                    ))}
+                  </RadioGroup>
+                  <Button
+                    variant={useTE ? "contained" : "outlined"}
+                    color={useTE ? "secondary" : "primary"}
+                    onClick={() => {
+                      setUseTE(!useTE);
+                    }}
+                    sx={{ ml: 2, height: 'fit-content' }}
+                  >
+                    TE用プロンプト{useTE ? '使用中' : 'を使用'}
+                  </Button>
+                </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  ドキュメントの種別を選択すると、それに適したFAQ生成プロンプトが自動的に設定されます
+                  {useTE ? 'TE用の特別なプロンプトを使用しています' : 'ドキュメントの種別を選択すると、それに適したFAQ生成プロンプトが自動的に設定されます'}
                 </Typography>
               </FormControl>
             </Box>
 
             <Divider />
 
-            {/* プロンプト編集セクション */}
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                プロンプト設定
-              </Typography>
-              <PromptEditor
-                onPromptChange={handlePromptChange}
-                defaultPrompt={DOCUMENT_TYPE_PROMPTS[documentType]}
-              />
-            </Box>
+            {/* TE用の場合、生成モードとプロンプト編集 */}
+            {useTE && (
+              <>
+                <Box>
+                  <FormControl component="fieldset">
+                    <FormLabel component="legend">
+                      <Typography variant="h6" sx={{ color: 'text.primary' }}>
+                        生成モード
+                      </Typography>
+                    </FormLabel>
+                    <RadioGroup
+                      row
+                      value={generationMode}
+                      onChange={(e) => setGenerationMode(e.target.value as GenerationMode)}
+                      sx={{ mt: 1, mb: 2 }}
+                    >
+                      <FormControlLabel
+                        value="questions_only"
+                        control={<Radio />}
+                        label="質問のみ生成"
+                      />
+                      <FormControlLabel
+                        value="answers_only"
+                        control={<Radio />}
+                        label="回答のみ生成"
+                      />
+                      <FormControlLabel
+                        value="both"
+                        control={<Radio />}
+                        label="両方生成"
+                      />
+                    </RadioGroup>
+                    <Typography variant="caption" color="text.secondary">
+                      {generationMode === 'questions_only' && '質問のみを生成し、回答は空欄になります'}
+                      {generationMode === 'answers_only' && '既存のFAQデータの質問に対して回答を生成します（CSVアップロードが必要）'}
+                      {generationMode === 'both' && '質問を生成してから、それに対する回答を生成します'}
+                    </Typography>
+                  </FormControl>
+                </Box>
+
+                {/* 回答のみ生成モードの場合、CSVアップロード */}
+                {generationMode === 'answers_only' && (
+                  <Box sx={{ p: 2, border: '2px dashed #ccc', borderRadius: 2, backgroundColor: '#f5f5f5' }}>
+                    <Typography variant="h6" gutterBottom>
+                      既存の質問CSVファイルをアップロード
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      質問と回答のCSVファイルをアップロードしてください。回答部分は生成されるため、空欄でも構いません。
+                    </Typography>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCsvFileChange}
+                      style={{ display: 'none' }}
+                      ref={csvInputRef}
+                    />
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<UploadFileIcon />}
+                      onClick={() => csvInputRef.current?.click()}
+                      sx={{ mb: csvFile ? 2 : 0 }}
+                    >
+                      CSVファイルを選択
+                    </Button>
+                    
+                    {csvFile && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          選択されたファイル: {csvFile.name}
+                        </Typography>
+                        {existingQuestions.length > 0 && (
+                          <Typography variant="body2" color="success.main">
+                            {existingQuestions.length}個の質問を読み込みました
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  {(generationMode === 'questions_only' || generationMode === 'both') && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        質問生成プロンプト
+                      </Typography>
+                      <PromptEditor
+                        onPromptChange={setTeQuestionPrompt}
+                        defaultPrompt={DEFAULT_TE_QUESTION_PROMPT}
+                      />
+                    </Box>
+                  )}
+                  {(generationMode === 'answers_only' || generationMode === 'both') && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        回答生成プロンプト
+                      </Typography>
+                      <PromptEditor
+                        onPromptChange={setTeAnswerPrompt}
+                        defaultPrompt={DEFAULT_TE_ANSWER_PROMPT}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              </>
+            )}
+
+            {/* 通常のプロンプト編集セクション */}
+            {!useTE && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  プロンプト設定
+                </Typography>
+                <PromptEditor
+                  onPromptChange={handlePromptChange}
+                  defaultPrompt={DOCUMENT_TYPE_PROMPTS[documentType]}
+                />
+              </Box>
+            )}
 
             <Divider />
 
@@ -469,7 +666,7 @@ export default function Home() {
                         }
                       }}
                       color="primary"
-                      disabled={enableTwoStageGeneration}
+                      disabled={enableTwoStageGeneration || useTE}
                     />
                   }
                   label={
@@ -497,7 +694,7 @@ export default function Home() {
                         }
                       }}
                       color="primary"
-                      disabled={enableValidation}
+                      disabled={enableValidation || useTE}
                     />
                   }
                   label={
