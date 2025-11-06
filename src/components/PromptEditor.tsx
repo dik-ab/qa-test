@@ -28,6 +28,13 @@ export default function PromptEditor({ onPromptChange, defaultPrompt }: PromptEd
   const [open, setOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState(defaultPrompt);
   const [isCustom, setIsCustom] = useState(false);
+  const [prevDefaultPrompt, setPrevDefaultPrompt] = useState(defaultPrompt);
+
+  // defaultPromptが変更されたら、currentPromptも更新
+  if (defaultPrompt !== prevDefaultPrompt && !isCustom) {
+    setCurrentPrompt(defaultPrompt);
+    setPrevDefaultPrompt(defaultPrompt);
+  }
 
   const handleOpen = () => {
     setOpen(true);
