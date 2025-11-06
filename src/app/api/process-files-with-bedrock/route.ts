@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { generateQuestionsFromText } from '@/utils/bedrock';
+import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
 
 export const maxDuration = 60;
 
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
     const comprehensiveMode = formData.get('comprehensiveMode') === 'true';
     const customPrompt = formData.get('customPrompt') as string | null;
     const fileType = formData.get('fileType') as string;
+    const documentType = (formData.get('documentType') as DocumentType) || 'general';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -176,11 +178,12 @@ export async function POST(request: NextRequest) {
       ? combinedText.substring(0, maxTextLength) + '...(テキストが長すぎるため切り詰められました)'
       : combinedText;
 
-    // 既存の質問生成機能を使用
+    // ドキュメントタイプに応じたプロンプトを使用して質問を生成
+    const promptToUse = getPromptForDocumentType(documentType, customPrompt || undefined);
     const questions = await generateQuestionsFromText(
       truncatedText,
       numQuestions,
-      customPrompt || undefined,
+      promptToUse,
       comprehensiveMode
     );
 
