@@ -23,7 +23,11 @@ import {
   Tab,
   ButtonGroup,
   FormControlLabel,
-  Checkbox
+  Checkbox,
+  RadioGroup,
+  Radio,
+  FormControl,
+  FormLabel
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -37,8 +41,8 @@ import LinkIcon from '@mui/icons-material/Link';
 import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
 import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
 import { downloadTextFile, generateTimestampedTextFilename, formatExtractedTextForDownload } from '@/utils/text';
-import { DEFAULT_PROMPT } from '@/utils/bedrock';
 import PromptEditor from '@/components/PromptEditor';
+import { DocumentType, DOCUMENT_TYPE_OPTIONS, DOCUMENT_TYPE_PROMPTS } from '@/utils/document-type-prompts';
 
 // 質問と回答の型定義
 interface Question {
@@ -79,9 +83,10 @@ export default function Home() {
   const [comprehensiveMode, setComprehensiveMode] = useState<boolean>(false);
   const [fileType, setFileType] = useState<FileType>('pdf');
   const [extractedText, setExtractedText] = useState<string | null>(null);
-  const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_PROMPT);
+  const [customPrompt, setCustomPrompt] = useState<string>(DOCUMENT_TYPE_PROMPTS['general']);
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
+  const [documentType, setDocumentType] = useState<DocumentType>('general');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -96,6 +101,17 @@ export default function Home() {
   // プロンプト変更ハンドラー
   const handlePromptChange = (prompt: string) => {
     setCustomPrompt(prompt);
+  };
+  
+  // ドキュメントタイプ変更ハンドラー
+  const handleDocumentTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newType = event.target.value as DocumentType;
+    setDocumentType(newType);
+    
+    // ドキュメントタイプに応じたデフォルトプロンプトを設定
+    if (!customPrompt || Object.values(DOCUMENT_TYPE_PROMPTS).includes(customPrompt)) {
+      setCustomPrompt(DOCUMENT_TYPE_PROMPTS[newType]);
+    }
   };
 
   // ファイル選択ハンドラー
@@ -205,9 +221,10 @@ export default function Home() {
       formData.append('numQuestions', numQuestions.toString());
       formData.append('comprehensiveMode', comprehensiveMode.toString());
       formData.append('fileType', fileType);
+      formData.append('documentType', documentType);
       
-      // カスタムプロンプトがデフォルトと異なる場合のみ送信
-      if (customPrompt !== DEFAULT_PROMPT) {
+      // カスタムプロンプトが現在のドキュメントタイプのデフォルトと異なる場合のみ送信
+      if (customPrompt !== DOCUMENT_TYPE_PROMPTS[documentType]) {
         formData.append('customPrompt', customPrompt);
       }
       
@@ -306,6 +323,37 @@ export default function Home() {
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <form onSubmit={handleSubmit}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* ドキュメントタイプ選択セクション */}
+            <Box>
+              <FormControl component="fieldset">
+                <FormLabel component="legend">
+                  <Typography variant="h6" sx={{ color: 'text.primary' }}>
+                    ドキュメント種別
+                  </Typography>
+                </FormLabel>
+                <RadioGroup
+                  row
+                  value={documentType}
+                  onChange={handleDocumentTypeChange}
+                  sx={{ mt: 1, mb: 2 }}
+                >
+                  {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                    <FormControlLabel
+                      key={option.value}
+                      value={option.value}
+                      control={<Radio />}
+                      label={option.label}
+                    />
+                  ))}
+                </RadioGroup>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  ドキュメントの種別を選択すると、それに適したFAQ生成プロンプトが自動的に設定されます
+                </Typography>
+              </FormControl>
+            </Box>
+
+            <Divider />
+
             {/* プロンプト編集セクション */}
             <Box>
               <Typography variant="h6" gutterBottom>
@@ -313,7 +361,7 @@ export default function Home() {
               </Typography>
               <PromptEditor
                 onPromptChange={handlePromptChange}
-                defaultPrompt={DEFAULT_PROMPT}
+                defaultPrompt={DOCUMENT_TYPE_PROMPTS[documentType]}
               />
             </Box>
 
