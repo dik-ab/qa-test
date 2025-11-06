@@ -3,6 +3,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import { generateQuestionsFromText } from '@/utils/bedrock';
 import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
 import { validateAndFixAnswers } from '@/utils/answer-validation';
+import { generateFAQTwoStage } from '@/utils/two-stage-generation';
 
 export const maxDuration = 60;
 
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
     const fileType = formData.get('fileType') as string;
     const documentType = (formData.get('documentType') as DocumentType) || 'general';
     const enableValidation = formData.get('enableValidation') === 'true';
+    const enableTwoStageGeneration = formData.get('enableTwoStageGeneration') === 'true';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -180,17 +182,30 @@ export async function POST(request: NextRequest) {
       ? combinedText.substring(0, maxTextLength) + '...(テキストが長すぎるため切り詰められました)'
       : combinedText;
 
-    // ドキュメントタイプに応じたプロンプトを使用して質問を生成
-    const promptToUse = getPromptForDocumentType(documentType, customPrompt || undefined);
-    let questions = await generateQuestionsFromText(
-      truncatedText,
-      numQuestions,
-      promptToUse,
-      comprehensiveMode
-    );
+    let questions;
 
-    // バリデーションが有効な場合、回答を検証・修正
-    if (enableValidation) {
+    if (enableTwoStageGeneration) {
+      // 2段階生成モードの場合
+      console.log('Using two-stage generation mode...');
+      questions = await generateFAQTwoStage(
+        truncatedText,
+        numQuestions,
+        documentType
+      );
+    } else {
+      // 通常の1段階生成モード
+      const promptToUse = getPromptForDocumentType(documentType, customPrompt || undefined);
+      questions = await generateQuestionsFromText(
+        truncatedText,
+        numQuestions,
+        promptToUse,
+        comprehensiveMode
+      );
+    }
+
+    // バリデーションが有効かつ2段階生成モードでない場合のみ、回答を検証・修正
+    // (2段階生成モードでは既に精度の高い回答が生成されているため)
+    if (enableValidation && !enableTwoStageGeneration) {
       const validatedQuestions = await validateAndFixAnswers(questions, truncatedText);
       questions = validatedQuestions.map(({ question, answer }) => ({ question, answer }));
     }
