@@ -87,6 +87,7 @@ export default function Home() {
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
   const [documentType, setDocumentType] = useState<DocumentType>('general');
+  const [enableValidation, setEnableValidation] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -222,6 +223,7 @@ export default function Home() {
       formData.append('comprehensiveMode', comprehensiveMode.toString());
       formData.append('fileType', fileType);
       formData.append('documentType', documentType);
+      formData.append('enableValidation', enableValidation.toString());
       
       // カスタムプロンプトが現在のドキュメントタイプのデフォルトと異なる場合のみ送信
       if (customPrompt !== DOCUMENT_TYPE_PROMPTS[documentType]) {
@@ -431,27 +433,51 @@ export default function Home() {
                 質問生成設定
               </Typography>
               
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={comprehensiveMode}
-                    onChange={(e) => setComprehensiveMode(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body1" component="span">
-                      網羅的生成モード
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                      AIが文書を分析してユーザーが疑問に思うであろう箇所を自動判断し、細かい部分まで網羅的に質問を生成します。
-                      このモードでは指定した質問数よりも多くの質問が生成される場合があります。
-                    </Typography>
-                  </Box>
-                }
-                sx={{ alignItems: 'flex-start', mb: 2 }}
-              />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={comprehensiveMode}
+                      onChange={(e) => setComprehensiveMode(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" component="span">
+                        網羅的生成モード
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        AIが文書を分析してユーザーが疑問に思うであろう箇所を自動判断し、細かい部分まで網羅的に質問を生成します。
+                        このモードでは指定した質問数よりも多くの質問が生成される場合があります。
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start' }}
+                />
+                
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={enableValidation}
+                      onChange={(e) => setEnableValidation(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" component="span">
+                        回答検証モード（推奨）
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        生成された回答がドキュメントに基づいているか検証し、推測や憶測が含まれている場合は
+                        「この質問に回答するための情報がドキュメント内に不足しています。」に置き換えます。
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start' }}
+                />
+              </Box>
               
               <Box sx={{ opacity: comprehensiveMode ? 0.5 : 1 }}>
                 <Typography gutterBottom>
