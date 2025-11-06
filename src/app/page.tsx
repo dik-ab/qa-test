@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, ChangeEvent, FormEvent } from 'react';
-import * as Tesseract from 'tesseract.js';
 import {
   Box,
   Button,
@@ -183,40 +182,6 @@ export default function Home() {
     }
   };
 
-  // 画像からテキストを抽出する関数
-  const extractTextFromImage = async (file: File): Promise<string> => {
-    try {
-      // Tesseract.jsを使用して画像からテキストを抽出
-      // Fileオブジェクトを直接渡す
-      const result = await Tesseract.recognize(
-        file,
-        'jpn+eng', // 日本語と英語を認識
-        {
-          logger: m => console.log(m), // 進行状況をログに出力
-        }
-      );
-      
-      return result.data.text;
-    } catch (error) {
-      console.error('Error extracting text from image:', error);
-      throw error;
-    }
-  };
-  
-  // 複数の画像からテキストを抽出する関数
-  const extractTextFromMultipleImages = async (imageFiles: File[]): Promise<string> => {
-    const texts = [];
-    
-    // 各画像からテキストを抽出（順次処理）
-    for (let i = 0; i < imageFiles.length; i++) {
-      const file = imageFiles[i];
-      const text = await extractTextFromImage(file);
-      texts.push(text);
-    }
-    
-    // 各画像から抽出したテキストを結合
-    return texts.join('\n\n--- 次の画像 ---\n\n');
-  };
 
   // フォーム送信ハンドラー
   const handleSubmit = async (event: FormEvent) => {
@@ -232,65 +197,35 @@ export default function Home() {
     setExtractedText(null);
     
     try {
-      if (fileType === 'pdf') {
-        // PDFファイルの場合は従来通りAPIに送信
-        const formData = new FormData();
-        files.forEach(file => {
-          formData.append('files', file);
-        });
-        formData.append('numQuestions', numQuestions.toString());
-        formData.append('comprehensiveMode', comprehensiveMode.toString());
-        
-        // カスタムプロンプトがデフォルトと異なる場合のみ送信
-        if (customPrompt !== DEFAULT_PROMPT) {
-          formData.append('customPrompt', customPrompt);
-        }
-        
-        const response = await fetch('/api/generate-questions', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'PDFの処理中にエラーが発生しました');
-        }
-        
-        const data = await response.json();
-        setQuestions(data.questions);
-        // PDFからも抽出されたテキストを設定
-        if (data.extractedText) {
-          setExtractedText(data.extractedText);
-        }
-        // PDFファイルの保存は行わないため、savedPdfPathsの処理は削除
-      } else {
-        // 画像ファイルの場合はクライアントサイドでテキスト抽出
-        const extractedTextContent = await extractTextFromMultipleImages(files);
-        setExtractedText(extractedTextContent);
-        
-        // 抽出したテキストをAPIに送信して質問を生成
-        const formData = new FormData();
-        formData.append('extractedText', extractedTextContent);
-        formData.append('numQuestions', numQuestions.toString());
-        formData.append('comprehensiveMode', comprehensiveMode.toString());
-        
-        // カスタムプロンプトがデフォルトと異なる場合のみ送信
-        if (customPrompt !== DEFAULT_PROMPT) {
-          formData.append('customPrompt', customPrompt);
-        }
-        
-        const response = await fetch('/api/extract-text-from-image', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'テキストの処理中にエラーが発生しました');
-        }
-        
-        const data = await response.json();
-        setQuestions(data.questions);
+      // PDFも画像も統一されたBedrockのAPIで処理
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+      formData.append('numQuestions', numQuestions.toString());
+      formData.append('comprehensiveMode', comprehensiveMode.toString());
+      formData.append('fileType', fileType);
+      
+      // カスタムプロンプトがデフォルトと異なる場合のみ送信
+      if (customPrompt !== DEFAULT_PROMPT) {
+        formData.append('customPrompt', customPrompt);
+      }
+      
+      const response = await fetch('/api/process-files-with-bedrock', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `${fileType === 'pdf' ? 'PDF' : '画像'}の処理中にエラーが発生しました`);
+      }
+      
+      const data = await response.json();
+      setQuestions(data.questions);
+      // 抽出されたテキストを設定
+      if (data.extractedText) {
+        setExtractedText(data.extractedText);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
