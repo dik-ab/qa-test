@@ -88,6 +88,7 @@ export default function Home() {
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
   const [documentType, setDocumentType] = useState<DocumentType>('general');
   const [enableValidation, setEnableValidation] = useState<boolean>(true);
+  const [enableTwoStageGeneration, setEnableTwoStageGeneration] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ファイルタイプ変更ハンドラー
@@ -224,6 +225,7 @@ export default function Home() {
       formData.append('fileType', fileType);
       formData.append('documentType', documentType);
       formData.append('enableValidation', enableValidation.toString());
+      formData.append('enableTwoStageGeneration', enableTwoStageGeneration.toString());
       
       // カスタムプロンプトが現在のドキュメントタイプのデフォルトと異なる場合のみ送信
       if (customPrompt !== DOCUMENT_TYPE_PROMPTS[documentType]) {
@@ -460,18 +462,52 @@ export default function Home() {
                   control={
                     <Checkbox
                       checked={enableValidation}
-                      onChange={(e) => setEnableValidation(e.target.checked)}
+                      onChange={(e) => {
+                        setEnableValidation(e.target.checked);
+                        if (e.target.checked) {
+                          setEnableTwoStageGeneration(false);
+                        }
+                      }}
                       color="primary"
+                      disabled={enableTwoStageGeneration}
                     />
                   }
                   label={
                     <Box>
                       <Typography variant="body1" component="span">
-                        回答検証モード（推奨）
+                        回答検証モード（標準精度）
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                         生成された回答がドキュメントに基づいているか検証し、推測や憶測が含まれている場合は
                         「この質問に回答するための情報がドキュメント内に不足しています。」に置き換えます。
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start' }}
+                />
+                
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={enableTwoStageGeneration}
+                      onChange={(e) => {
+                        setEnableTwoStageGeneration(e.target.checked);
+                        if (e.target.checked) {
+                          setEnableValidation(false);
+                        }
+                      }}
+                      color="primary"
+                      disabled={enableValidation}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" component="span">
+                        2段階生成モード（最高精度）
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        質問生成と回答生成を分離して処理します。回答検証も自動的に含まれ、
+                        最も精度の高いFAQが生成されますが、処理時間が長くなります。
                       </Typography>
                     </Box>
                   }
@@ -510,6 +546,7 @@ export default function Home() {
                   disabled={isLoading || files.length === 0}
                   startIcon={<QuestionAnswerIcon />}
                   size="large"
+                  onClick={() => console.log('Button clicked. isLoading:', isLoading, 'files:', files)}
                 >
                   {fileType === 'pdf' ? 'PDF' : '画像'}からクエスチョンデータを生成
                 </Button>
