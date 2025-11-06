@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { generateQuestionsFromText } from '@/utils/bedrock';
 import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
+import { validateAndFixAnswers } from '@/utils/answer-validation';
 
 export const maxDuration = 60;
 
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
     const customPrompt = formData.get('customPrompt') as string | null;
     const fileType = formData.get('fileType') as string;
     const documentType = (formData.get('documentType') as DocumentType) || 'general';
+    const enableValidation = formData.get('enableValidation') === 'true';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -180,12 +182,18 @@ export async function POST(request: NextRequest) {
 
     // ドキュメントタイプに応じたプロンプトを使用して質問を生成
     const promptToUse = getPromptForDocumentType(documentType, customPrompt || undefined);
-    const questions = await generateQuestionsFromText(
+    let questions = await generateQuestionsFromText(
       truncatedText,
       numQuestions,
       promptToUse,
       comprehensiveMode
     );
+
+    // バリデーションが有効な場合、回答を検証・修正
+    if (enableValidation) {
+      const validatedQuestions = await validateAndFixAnswers(questions, truncatedText);
+      questions = validatedQuestions.map(({ question, answer }) => ({ question, answer }));
+    }
 
     return NextResponse.json({
       questions,
