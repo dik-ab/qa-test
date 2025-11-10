@@ -3,7 +3,6 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import { generateQuestionsFromText } from '@/utils/bedrock';
 import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
 import { validateAndFixAnswers } from '@/utils/answer-validation';
-import { generateFAQTwoStage } from '@/utils/two-stage-generation';
 import { GenerationMode, generateFAQFlexible } from '@/utils/flexible-generation';
 
 export const maxDuration = 60;
@@ -43,6 +42,7 @@ export async function POST(request: NextRequest) {
     const existingQuestionsJson = formData.get('existingQuestions') as string | null;
     const existingQuestions = existingQuestionsJson ? JSON.parse(existingQuestionsJson) : undefined;
     const generateExpansion = formData.get('generateExpansion') === 'true';
+    const enableStability = formData.get('enableStability') === 'true';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -203,7 +203,8 @@ export async function POST(request: NextRequest) {
         teAnswerPrompt || undefined,
         numQuestions,
         true, // TEモード
-        generateExpansion
+        generateExpansion,
+        enableStability
       );
     } else if (enableTwoStageGeneration || generationMode !== 'both') {
       // 2段階生成モードまたは通常モードで質問・回答を別々に生成する場合
@@ -218,7 +219,8 @@ export async function POST(request: NextRequest) {
         customPrompt || undefined, // カスタム回答プロンプト
         numQuestions,
         false, // C向けなのでTEモードではない
-        generateExpansion
+        generateExpansion,
+        enableStability
       );
     } else {
       // 通常の1段階生成モード
