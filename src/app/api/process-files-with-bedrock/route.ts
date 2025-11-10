@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const teAnswerPrompt = formData.get('teAnswerPrompt') as string | null;
     const existingQuestionsJson = formData.get('existingQuestions') as string | null;
     const existingQuestions = existingQuestionsJson ? JSON.parse(existingQuestionsJson) : undefined;
+    const generateExpansion = formData.get('generateExpansion') === 'true';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -200,15 +201,24 @@ export async function POST(request: NextRequest) {
         existingQuestions, // 既存の質問（answers_onlyモードで使用）
         teQuestionPrompt || undefined,
         teAnswerPrompt || undefined,
-        numQuestions
-      );
-    } else if (enableTwoStageGeneration) {
-      // 2段階生成モードの場合
-      console.log('Using two-stage generation mode...');
-      questions = await generateFAQTwoStage(
-        truncatedText,
         numQuestions,
-        documentType
+        true, // TEモード
+        generateExpansion
+      );
+    } else if (enableTwoStageGeneration || generationMode !== 'both') {
+      // 2段階生成モードまたは通常モードで質問・回答を別々に生成する場合
+      console.log('Using flexible generation mode:', generationMode);
+      
+      // C向けの場合、専用プロンプトを使用（カスタムプロンプトがない場合）
+      questions = await generateFAQFlexible(
+        truncatedText,
+        generationMode,
+        existingQuestions, // 既存の質問（answers_onlyモードで使用）
+        customPrompt || undefined, // カスタム質問プロンプト
+        customPrompt || undefined, // カスタム回答プロンプト
+        numQuestions,
+        false, // C向けなのでTEモードではない
+        generateExpansion
       );
     } else {
       // 通常の1段階生成モード
