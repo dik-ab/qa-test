@@ -108,6 +108,7 @@ export default function Home() {
   const [editedQuestion, setEditedQuestion] = useState<string>('');
   const [editedAnswer, setEditedAnswer] = useState<string>('');
   const [generateExpansion, setGenerateExpansion] = useState<boolean>(false);
+  const [enableStability, setEnableStability] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -262,6 +263,7 @@ export default function Home() {
       formData.append('generationMode', generationMode);
       formData.append('useTE', useTE.toString());
       formData.append('generateExpansion', generateExpansion.toString());
+      formData.append('enableStability', enableStability.toString());
       
       // TE用プロンプトの送信
       if (useTE) {
@@ -328,19 +330,84 @@ export default function Home() {
       
       try {
         const text = await file.text();
-        const lines = text.split('\n').filter(line => line.trim());
+        
+        // CSVパーサー関数
+        const parseCSV = (csvText: string): string[][] => {
+          const rows: string[][] = [];
+          let currentRow: string[] = [];
+          let currentField = '';
+          let insideQuotes = false;
+          let i = 0;
+          
+          // BOMを削除
+          const cleanText = csvText.replace(/^\uFEFF/, '');
+          
+          while (i < cleanText.length) {
+            const char = cleanText[i];
+            
+            if (char === '"') {
+              if (insideQuotes && cleanText[i + 1] === '"') {
+                // エスケープされたクォート
+                currentField += '"';
+                i += 2;
+              } else {
+                // クォートの開始または終了
+                insideQuotes = !insideQuotes;
+                i++;
+              }
+            } else if (char === ',' && !insideQuotes) {
+              // フィールドの区切り
+              currentRow.push(currentField);
+              currentField = '';
+              i++;
+            } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+              // 行の区切り
+              currentRow.push(currentField);
+              if (currentRow.some(field => field.trim() !== '')) {
+                rows.push(currentRow);
+              }
+              currentRow = [];
+              currentField = '';
+              
+              // \r\nの場合は\nもスキップ
+              if (char === '\r' && cleanText[i + 1] === '\n') {
+                i += 2;
+              } else {
+                i++;
+              }
+            } else {
+              currentField += char;
+              i++;
+            }
+          }
+          
+          // 最後のフィールドと行を追加
+          if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField);
+            if (currentRow.some(field => field.trim() !== '')) {
+              rows.push(currentRow);
+            }
+          }
+          
+          return rows;
+        };
+        
+        const rows = parseCSV(text);
         const parsedQuestions: Question[] = [];
         
         // ヘッダー行をスキップして処理
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i];
-          // CSVの各行をパース（カンマ区切りで、引用符内のカンマは無視）
-          const match = line.match(/(?:^|,)("(?:[^"]+|"")*"|[^,]*)/g);
-          if (match && match.length >= 2) {
-            const question = match[0].replace(/^,|^"|"$/g, '').replace(/""/g, '"').trim();
-            const answer = match[1].replace(/^,|^"|"$/g, '').replace(/""/g, '"').trim();
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (row.length >= 2) {
+            const question = row[0].trim();
+            const answer = row[1].trim();
+            // 拡張フィールドがある場合も処理
             if (question) {
-              parsedQuestions.push({ question, answer });
+              const questionObj: Question = { question, answer };
+              if (row.length > 2 && row[2]) questionObj.expansionData = row[2].trim();
+              if (row.length > 3 && row[3]) questionObj.pageNumber = row[3].trim();
+              if (row.length > 4 && row[4]) questionObj.location = row[4].trim();
+              parsedQuestions.push(questionObj);
             }
           }
         }
@@ -353,6 +420,7 @@ export default function Home() {
         
         setExistingQuestions(parsedQuestions);
         setError(null);
+        console.log(`読み込まれた質問数: ${parsedQuestions.length}`);
       } catch (err) {
         setError('CSVファイルの読み込み中にエラーが発生しました');
         setCsvFile(null);
@@ -744,6 +812,28 @@ export default function Home() {
                       <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                         回答生成時に、FAQ検索用の質問拡張データと、該当情報のページ数・場所を抽出します。
                         処理時間が長くなる場合があります。
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start' }}
+                />
+                
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={enableStability}
+                      onChange={(e) => setEnableStability(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" component="span">
+                        同一性担保モード（実験的機能）
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        質問を3回生成し、一致するものだけを出力します。
+                        より安定した質問セットが生成されますが、処理時間が約3倍になります。
                       </Typography>
                     </Box>
                   }
