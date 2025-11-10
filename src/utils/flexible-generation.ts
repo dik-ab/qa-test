@@ -2,6 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import { TE_QUESTION_PROMPT, TE_ANSWER_PROMPT } from './te-prompts';
 import { CONSUMER_QUESTION_PROMPT, CONSUMER_ANSWER_PROMPT } from './consumer-prompts';
 import { generateAllExpansionData } from './generate-expansion-data';
+import { generateStableQuestions } from './stability-generation';
 
 // 生成モードの定義
 export type GenerationMode = 'questions_only' | 'answers_only' | 'both';
@@ -213,13 +214,18 @@ export async function generateFAQFlexible(
   customAnswerPrompt?: string,
   numQuestions: number = 30,
   isTE: boolean = true,
-  generateExpansion: boolean = false
+  generateExpansion: boolean = false,
+  enableStability: boolean = false
 ): Promise<Array<{ question: string; answer: string; pageNumber?: string; location?: string; expansionData?: string }>> {
   try {
     switch (mode) {
       case 'questions_only':
         // 質問のみ生成
         console.log('Generating questions only...');
+        if (enableStability) {
+          console.log('Using stability mode for questions...');
+          return await generateStableQuestions(text, numQuestions, customQuestionPrompt, isTE);
+        }
         return await generateQuestions(text, numQuestions, customQuestionPrompt, isTE);
 
       case 'answers_only':
@@ -241,7 +247,13 @@ export async function generateFAQFlexible(
       case 'both':
         // 両方生成（2段階）
         console.log('Generating both questions and answers...');
-        const questions = await generateQuestions(text, numQuestions, customQuestionPrompt, isTE);
+        let questions;
+        if (enableStability) {
+          console.log('Using stability mode for questions...');
+          questions = await generateStableQuestions(text, numQuestions, customQuestionPrompt, isTE);
+        } else {
+          questions = await generateQuestions(text, numQuestions, customQuestionPrompt, isTE);
+        }
         if (questions.length === 0) {
           return [];
         }
