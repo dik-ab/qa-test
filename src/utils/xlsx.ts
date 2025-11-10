@@ -2,24 +2,54 @@ import * as XLSX from 'xlsx';
 
 /**
  * QAデータをXLSX形式に変換してダウンロードする
- * @param questions 質問と回答のリスト
+ * @param questions 質問と回答のリスト（拡張フィールドも含む）
  * @param filename ファイル名（デフォルト: qa_data.xlsx）
  */
-export function downloadXLSX(questions: Array<{ question: string, answer: string }>, filename: string = 'qa_data.xlsx'): void {
+export function downloadXLSX(
+  questions: Array<{
+    question: string;
+    answer: string;
+    pageNumber?: string;
+    location?: string;
+    expansionData?: string;
+  }>,
+  filename: string = 'qa_data.xlsx'
+): void {
+  // 拡張データが含まれているかチェック
+  const hasExpansionData = questions.some(q => q.pageNumber || q.location || q.expansionData);
+  
   // ワークシートのデータを準備
+  const headers = hasExpansionData 
+    ? ['質問', '回答', '質問拡張データ', 'ページ数', '場所']
+    : ['質問', '回答'];
+    
   const worksheetData = [
-    ['質問', '回答'], // ヘッダー行
-    ...questions.map(item => [item.question, item.answer])
+    headers, // ヘッダー行
+    ...questions.map(item => {
+      const baseFields = [item.question, item.answer];
+      if (hasExpansionData) {
+        return [...baseFields, item.expansionData || '', item.pageNumber || '', item.location || ''];
+      }
+      return baseFields;
+    })
   ];
 
   // ワークシートを作成
   const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
   // 列幅を自動調整
-  const columnWidths = [
-    { wch: 50 }, // 質問列の幅
-    { wch: 80 }  // 回答列の幅
-  ];
+  const columnWidths = hasExpansionData 
+    ? [
+        { wch: 50 }, // 質問列の幅
+        { wch: 80 }, // 回答列の幅
+        { wch: 60 }, // 質問拡張データ列の幅
+        { wch: 15 }, // ページ数列の幅
+        { wch: 30 }  // 場所列の幅
+      ]
+    : [
+        { wch: 50 }, // 質問列の幅
+        { wch: 80 }  // 回答列の幅
+      ];
   worksheet['!cols'] = columnWidths;
 
   // セルのスタイルを設定（ヘッダー行を太字にする）
@@ -80,14 +110,35 @@ export function generateTimestampedXLSXFilename(prefix: string = 'qa_data'): str
 
 /**
  * QAデータをXLSX形式のバイナリデータに変換する
- * @param questions 質問と回答のリスト
+ * @param questions 質問と回答のリスト（拡張フィールドも含む）
  * @returns XLSX形式のArrayBuffer
  */
-export function convertQuestionsToXLSX(questions: Array<{ question: string, answer: string }>): ArrayBuffer {
+export function convertQuestionsToXLSX(
+  questions: Array<{
+    question: string;
+    answer: string;
+    pageNumber?: string;
+    location?: string;
+    expansionData?: string;
+  }>
+): ArrayBuffer {
+  // 拡張データが含まれているかチェック
+  const hasExpansionData = questions.some(q => q.pageNumber || q.location || q.expansionData);
+  
   // ワークシートのデータを準備
+  const headers = hasExpansionData 
+    ? ['質問', '回答', '質問拡張データ', 'ページ数', '場所']
+    : ['質問', '回答'];
+    
   const worksheetData = [
-    ['質問', '回答'], // ヘッダー行
-    ...questions.map(item => [item.question, item.answer])
+    headers, // ヘッダー行
+    ...questions.map(item => {
+      const baseFields = [item.question, item.answer];
+      if (hasExpansionData) {
+        return [...baseFields, item.expansionData || '', item.pageNumber || '', item.location || ''];
+      }
+      return baseFields;
+    })
   ];
 
   // ワークシートを作成
