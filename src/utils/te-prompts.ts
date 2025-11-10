@@ -115,11 +115,11 @@ export const TE_QUESTION_PROMPT = `
 [
   {
     "question": "生成した質問文",
-    "answer": "空欄"
+    "answer": ""
   },
   {
     "question": "次の質問文",
-    "answer": "空欄"
+    "answer": ""
   }
 ]
 `;
