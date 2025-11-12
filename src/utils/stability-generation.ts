@@ -23,7 +23,7 @@ export async function generateStableQuestions(
     
     // 質問を3回生成（より多めに生成して一致率を上げる）
     const generationCount = 3;
-    const questionsPerRound = Math.ceil(numQuestions * 2); // 2倍の数を生成
+    const questionsPerRound = Math.ceil(numQuestions * 4); // 4倍の数を生成して十分な一致を確保
     
     const allResults = await Promise.all(
       Array(generationCount).fill(null).map(() => 
@@ -36,7 +36,24 @@ export async function generateStableQuestions(
       result.map(item => item.question.trim().toLowerCase())
     );
     
-    // 3回すべてに出現する質問を見つける
+    // 類似度を計算する関数（シンプルな文字列類似度）
+    const calculateSimilarity = (str1: string, str2: string): number => {
+      const s1 = str1.toLowerCase();
+      const s2 = str2.toLowerCase();
+      
+      // 完全一致
+      if (s1 === s2) return 1.0;
+      
+      // 単語の共通度をチェック
+      const words1 = s1.split(/\s+/);
+      const words2 = s2.split(/\s+/);
+      const commonWords = words1.filter(w => words2.includes(w)).length;
+      const similarity = (commonWords * 2) / (words1.length + words2.length);
+      
+      return similarity;
+    };
+    
+    // 3回すべてに出現する質問を見つける（類似度ベース）
     const commonQuestions: Array<{ question: string; answer: string }> = [];
     const seen = new Set<string>();
     
@@ -47,9 +64,9 @@ export async function generateStableQuestions(
       // 既に処理済みの場合はスキップ
       if (seen.has(normalizedQuestion)) continue;
       
-      // 他の2回でも同じ質問が存在するかチェック
+      // 他の2回でも類似の質問が存在するかチェック（類似度0.9以上）
       const existsInAllRounds = questionSets.slice(1).every(set => 
-        set.includes(normalizedQuestion)
+        set.some(q => calculateSimilarity(normalizedQuestion, q) >= 0.9)
       );
       
       if (existsInAllRounds) {
@@ -66,11 +83,33 @@ export async function generateStableQuestions(
     
     console.log(`Found ${commonQuestions.length} stable questions out of ${numQuestions} requested`);
     
-    // 一致する質問が少なすぎる場合は警告
+    // 一致する質問が少なすぎる場合は、2回一致でもOKとする
     if (commonQuestions.length < numQuestions * 0.5) {
-      console.warn(`Only ${commonQuestions.length} stable questions found. Consider adjusting prompts or generation parameters.`);
+      console.warn(`Only ${commonQuestions.length} stable questions found with 3-way match. Trying 2-way match...`);
+      
+      // 2回以上出現する質問を追加
+      for (const item of allResults[0]) {
+        if (commonQuestions.length >= numQuestions) break;
+        
+        const normalizedQuestion = item.question.trim().toLowerCase();
+        if (seen.has(normalizedQuestion)) continue;
+        
+        // 少なくとも1回は他の結果に類似の質問が存在するかチェック
+        const appearanceCount = questionSets.slice(1).filter(set => 
+          set.some(q => calculateSimilarity(normalizedQuestion, q) >= 0.9)
+        ).length;
+        
+        if (appearanceCount >= 1) {
+          commonQuestions.push({
+            question: item.question.trim(),
+            answer: item.answer
+          });
+          seen.add(normalizedQuestion);
+        }
+      }
     }
     
+    console.log(`Final count: ${commonQuestions.length} stable questions`);
     return commonQuestions;
   } catch (error) {
     console.error('Error in stable question generation:', error);
