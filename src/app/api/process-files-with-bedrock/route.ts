@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { generateQuestionsFromText } from '@/utils/bedrock';
 import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
-import { validateAndFixAnswers } from '@/utils/answer-validation';
 import { GenerationMode, generateFAQFlexible } from '@/utils/flexible-generation';
 
 export const maxDuration = 60;
@@ -29,12 +28,9 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const numQuestions = Number(formData.get('numQuestions') || 5);
-    const comprehensiveMode = formData.get('comprehensiveMode') === 'true';
     const customPrompt = formData.get('customPrompt') as string | null;
     const fileType = formData.get('fileType') as string;
-    const documentType = (formData.get('documentType') as DocumentType) || 'general';
-    const enableValidation = formData.get('enableValidation') === 'true';
-    const enableTwoStageGeneration = formData.get('enableTwoStageGeneration') === 'true';
+    const documentType = (formData.get('documentType') as DocumentType) || 'consumer';
     const generationMode = (formData.get('generationMode') as GenerationMode) || 'both';
     const useTE = formData.get('useTE') === 'true';
     const teQuestionPrompt = formData.get('teQuestionPrompt') as string | null;
@@ -206,7 +202,7 @@ export async function POST(request: NextRequest) {
         generateExpansion,
         enableStability
       );
-    } else if (enableTwoStageGeneration || generationMode !== 'both') {
+    } else if (generationMode !== 'both') {
       // 2段階生成モードまたは通常モードで質問・回答を別々に生成する場合
       console.log('Using flexible generation mode:', generationMode);
       
@@ -228,17 +224,10 @@ export async function POST(request: NextRequest) {
       questions = await generateQuestionsFromText(
         truncatedText,
         numQuestions,
-        promptToUse,
-        comprehensiveMode
+        promptToUse
       );
     }
 
-    // バリデーションが有効かつ2段階生成モード・TEモードでない場合のみ、回答を検証・修正
-    // (2段階生成モードとTEモードでは既に精度の高い回答が生成されているため)
-    if (enableValidation && !enableTwoStageGeneration && !useTE) {
-      const validatedQuestions = await validateAndFixAnswers(questions, truncatedText);
-      questions = validatedQuestions.map(({ question, answer }) => ({ question, answer }));
-    }
 
     return NextResponse.json({
       questions,
