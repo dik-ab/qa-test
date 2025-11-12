@@ -88,7 +88,6 @@ export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [numQuestions, setNumQuestions] = useState<number>(5);
-  const [comprehensiveMode, setComprehensiveMode] = useState<boolean>(false);
   const [fileType, setFileType] = useState<FileType>('pdf');
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [savedExtractedText, setSavedExtractedText] = useState<string | null>(null); // 質問生成時のテキストを保存
@@ -96,8 +95,6 @@ export default function Home() {
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
   const [documentType, setDocumentType] = useState<DocumentType>('consumer');
-  const [enableValidation, setEnableValidation] = useState<boolean>(true);
-  const [enableTwoStageGeneration, setEnableTwoStageGeneration] = useState<boolean>(false);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('both');
   const [useTE, setUseTE] = useState<boolean>(false);
   const [teQuestionPrompt, setTeQuestionPrompt] = useState<string>(DEFAULT_TE_QUESTION_PROMPT);
@@ -255,11 +252,8 @@ export default function Home() {
         formData.append('files', file);
       });
       formData.append('numQuestions', numQuestions.toString());
-      formData.append('comprehensiveMode', comprehensiveMode.toString());
       formData.append('fileType', fileType);
       formData.append('documentType', documentType);
-      formData.append('enableValidation', enableValidation.toString());
-      formData.append('enableTwoStageGeneration', enableTwoStageGeneration.toString());
       formData.append('generationMode', generationMode);
       formData.append('useTE', useTE.toString());
       formData.append('generateExpansion', generateExpansion.toString());
@@ -720,84 +714,6 @@ export default function Home() {
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={comprehensiveMode}
-                      onChange={(e) => setComprehensiveMode(e.target.checked)}
-                      color="primary"
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body1" component="span">
-                        網羅的生成モード
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        AIが文書を分析してユーザーが疑問に思うであろう箇所を自動判断し、細かい部分まで網羅的に質問を生成します。
-                        このモードでは指定した質問数よりも多くの質問が生成される場合があります。
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ alignItems: 'flex-start' }}
-                />
-                
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={enableValidation}
-                      onChange={(e) => {
-                        setEnableValidation(e.target.checked);
-                        if (e.target.checked) {
-                          setEnableTwoStageGeneration(false);
-                        }
-                      }}
-                      color="primary"
-                      disabled={enableTwoStageGeneration || useTE}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body1" component="span">
-                        回答検証モード（標準精度）
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        生成された回答がドキュメントに基づいているか検証し、推測や憶測が含まれている場合は
-                        「この質問に回答するための情報がドキュメント内に不足しています。」に置き換えます。
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ alignItems: 'flex-start' }}
-                />
-                
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={enableTwoStageGeneration}
-                      onChange={(e) => {
-                        setEnableTwoStageGeneration(e.target.checked);
-                        if (e.target.checked) {
-                          setEnableValidation(false);
-                        }
-                      }}
-                      color="primary"
-                      disabled={enableValidation || useTE}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body1" component="span">
-                        2段階生成モード（最高精度）
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        質問生成と回答生成を分離して処理します。回答検証も自動的に含まれ、
-                        最も精度の高いFAQが生成されますが、処理時間が長くなります。
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ alignItems: 'flex-start' }}
-                />
-                
-                <FormControlLabel
-                  control={
-                    <Checkbox
                       checked={generateExpansion}
                       onChange={(e) => setGenerateExpansion(e.target.checked)}
                       color="primary"
@@ -841,14 +757,9 @@ export default function Home() {
                 />
               </Box>
               
-              <Box sx={{ opacity: comprehensiveMode ? 0.5 : 1 }}>
+              <Box>
                 <Typography gutterBottom>
                   生成する質問数: {numQuestions}
-                  {comprehensiveMode && (
-                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                      （網羅的モードでは参考値として使用）
-                    </Typography>
-                  )}
                 </Typography>
                 <Slider
                   value={numQuestions}
@@ -858,7 +769,6 @@ export default function Home() {
                   step={1}
                   marks
                   valueLabelDisplay="auto"
-                  disabled={comprehensiveMode}
                 />
               </Box>
             </Box>
