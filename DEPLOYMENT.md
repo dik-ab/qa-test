@@ -24,7 +24,7 @@ App RunnerサービスがBedrockにアクセスできるよう、以下のIAMポ
                 "bedrock:InvokeModelWithResponseStream"
             ],
             "Resource": [
-                "arn:aws:bedrock:us-east-1::foundation-model/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+                "arn:aws:bedrock:ap-northeast-1::foundation-model/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
             ]
         }
     ]
@@ -93,14 +93,14 @@ AWS Management Consoleを使用してApp Runnerサービスを作成：
    - **Instance role**: 上記で作成した`AppRunnerBedrockRole`を選択
 8. **Environment variables**を設定（必要に応じて）：
    - `NODE_ENV`: `production`
-   - `AWS_REGION`: `us-east-1`
+   - `AWS_REGION`: `ap-northeast-1`
 
 ### 3. 環境変数の設定
 
 App Runnerサービス作成後、必要に応じて以下の環境変数を設定：
 
 - `NODE_ENV`: `production`
-- `AWS_REGION`: `us-east-1`
+- `AWS_REGION`: `ap-northeast-1`
 - その他のアプリケーション固有の環境変数
 
 ### 4. デプロイの確認
