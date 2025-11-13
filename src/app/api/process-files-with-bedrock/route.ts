@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 // AWS Bedrock クライアントの初期化
 const bedrockClient = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'ap-northeast-1',
   ...(process.env.NODE_ENV === 'production' 
     ? {}
     : {
