@@ -1,5 +1,5 @@
 # AWS設定
-aws_region = "us-east-1"
+aws_region = "ap-northeast-1"
 
 # アプリケーション設定
 app_name = "qamatching-app"
@@ -23,7 +23,7 @@ min_size        = 1   # 1-1000
 # 環境変数
 environment_variables = {
   NODE_ENV   = "production"
-  AWS_REGION = "us-east-1"
+  AWS_REGION = "ap-northeast-1"
   PORT       = "3000"
 }
 
