@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { generateQuestionsFromText } from '@/utils/bedrock';
 import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
-import { validateAndFixAnswers } from '@/utils/answer-validation';
-import { generateFAQTwoStage } from '@/utils/two-stage-generation';
 import { GenerationMode, generateFAQFlexible } from '@/utils/flexible-generation';
 
 export const maxDuration = 60;
 
 // AWS Bedrock クライアントの初期化
 const bedrockClient = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'ap-northeast-1',
   ...(process.env.NODE_ENV === 'production' 
     ? {}
     : {
@@ -30,18 +28,17 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const numQuestions = Number(formData.get('numQuestions') || 5);
-    const comprehensiveMode = formData.get('comprehensiveMode') === 'true';
     const customPrompt = formData.get('customPrompt') as string | null;
     const fileType = formData.get('fileType') as string;
-    const documentType = (formData.get('documentType') as DocumentType) || 'general';
-    const enableValidation = formData.get('enableValidation') === 'true';
-    const enableTwoStageGeneration = formData.get('enableTwoStageGeneration') === 'true';
+    const documentType = (formData.get('documentType') as DocumentType) || 'consumer';
     const generationMode = (formData.get('generationMode') as GenerationMode) || 'both';
     const useTE = formData.get('useTE') === 'true';
     const teQuestionPrompt = formData.get('teQuestionPrompt') as string | null;
     const teAnswerPrompt = formData.get('teAnswerPrompt') as string | null;
     const existingQuestionsJson = formData.get('existingQuestions') as string | null;
     const existingQuestions = existingQuestionsJson ? JSON.parse(existingQuestionsJson) : undefined;
+    const generateExpansion = formData.get('generateExpansion') === 'true';
+    const enableStability = formData.get('enableStability') === 'true';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -200,15 +197,26 @@ export async function POST(request: NextRequest) {
         existingQuestions, // 既存の質問（answers_onlyモードで使用）
         teQuestionPrompt || undefined,
         teAnswerPrompt || undefined,
-        numQuestions
-      );
-    } else if (enableTwoStageGeneration) {
-      // 2段階生成モードの場合
-      console.log('Using two-stage generation mode...');
-      questions = await generateFAQTwoStage(
-        truncatedText,
         numQuestions,
-        documentType
+        true, // TEモード
+        generateExpansion,
+        enableStability
+      );
+    } else if (generationMode !== 'both') {
+      // 2段階生成モードまたは通常モードで質問・回答を別々に生成する場合
+      console.log('Using flexible generation mode:', generationMode);
+      
+      // C向けの場合、専用プロンプトを使用（カスタムプロンプトがない場合）
+      questions = await generateFAQFlexible(
+        truncatedText,
+        generationMode,
+        existingQuestions, // 既存の質問（answers_onlyモードで使用）
+        customPrompt || undefined, // カスタム質問プロンプト
+        customPrompt || undefined, // カスタム回答プロンプト
+        numQuestions,
+        false, // C向けなのでTEモードではない
+        generateExpansion,
+        enableStability
       );
     } else {
       // 通常の1段階生成モード
@@ -216,17 +224,10 @@ export async function POST(request: NextRequest) {
       questions = await generateQuestionsFromText(
         truncatedText,
         numQuestions,
-        promptToUse,
-        comprehensiveMode
+        promptToUse
       );
     }
 
-    // バリデーションが有効かつ2段階生成モード・TEモードでない場合のみ、回答を検証・修正
-    // (2段階生成モードとTEモードでは既に精度の高い回答が生成されているため)
-    if (enableValidation && !enableTwoStageGeneration && !useTE) {
-      const validatedQuestions = await validateAndFixAnswers(questions, truncatedText);
-      questions = validatedQuestions.map(({ question, answer }) => ({ question, answer }));
-    }
 
     return NextResponse.json({
       questions,

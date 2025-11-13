@@ -27,7 +27,9 @@ import {
   RadioGroup,
   Radio,
   FormControl,
-  FormLabel
+  FormLabel,
+  TextField,
+  IconButton
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -36,8 +38,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import TableViewIcon from '@mui/icons-material/TableView';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import CompareIcon from '@mui/icons-material/Compare';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import LinkIcon from '@mui/icons-material/Link';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { convertQuestionsToCSV, downloadCSV, generateTimestampedFilename } from '@/utils/csv';
 import { downloadXLSX, generateTimestampedXLSXFilename } from '@/utils/xlsx';
 import { downloadTextFile, generateTimestampedTextFilename, formatExtractedTextForDownload } from '@/utils/text';
@@ -50,6 +53,9 @@ import { DEFAULT_TE_QUESTION_PROMPT, DEFAULT_TE_ANSWER_PROMPT } from '@/utils/te
 interface Question {
   question: string;
   answer: string;
+  pageNumber?: string;
+  location?: string;
+  expansionData?: string;
 }
 
 // API レスポンスの型定義
@@ -82,21 +88,24 @@ export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [numQuestions, setNumQuestions] = useState<number>(5);
-  const [comprehensiveMode, setComprehensiveMode] = useState<boolean>(false);
   const [fileType, setFileType] = useState<FileType>('pdf');
   const [extractedText, setExtractedText] = useState<string | null>(null);
-  const [customPrompt, setCustomPrompt] = useState<string>(DOCUMENT_TYPE_PROMPTS['general']);
+  const [savedExtractedText, setSavedExtractedText] = useState<string | null>(null); // 質問生成時のテキストを保存
+  const [customPrompt, setCustomPrompt] = useState<string>(DOCUMENT_TYPE_PROMPTS['consumer']);
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
-  const [documentType, setDocumentType] = useState<DocumentType>('general');
-  const [enableValidation, setEnableValidation] = useState<boolean>(true);
-  const [enableTwoStageGeneration, setEnableTwoStageGeneration] = useState<boolean>(false);
+  const [documentType, setDocumentType] = useState<DocumentType>('consumer');
   const [generationMode, setGenerationMode] = useState<GenerationMode>('both');
   const [useTE, setUseTE] = useState<boolean>(false);
   const [teQuestionPrompt, setTeQuestionPrompt] = useState<string>(DEFAULT_TE_QUESTION_PROMPT);
   const [teAnswerPrompt, setTeAnswerPrompt] = useState<string>(DEFAULT_TE_ANSWER_PROMPT);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editedQuestion, setEditedQuestion] = useState<string>('');
+  const [editedAnswer, setEditedAnswer] = useState<string>('');
+  const [generateExpansion, setGenerateExpansion] = useState<boolean>(false);
+  const [enableStability, setEnableStability] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +127,13 @@ export default function Home() {
   const handleDocumentTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newType = event.target.value as DocumentType;
     setDocumentType(newType);
+    
+    // B/E向けの場合は自動的にTEモードを有効にする
+    if (newType === 'enterprise') {
+      setUseTE(true);
+    } else {
+      setUseTE(false);
+    }
     
     // ドキュメントタイプに応じたデフォルトプロンプトを設定
     if (!customPrompt || Object.values(DOCUMENT_TYPE_PROMPTS).includes(customPrompt)) {
@@ -161,7 +177,7 @@ export default function Home() {
   const handleNumQuestionsChange = (_event: Event, value: number | number[]) => {
     setNumQuestions(value as number);
   };
-
+  console.log("questions", questions)
   // CSVダウンロードハンドラー
   const handleDownloadCSV = () => {
     if (questions.length === 0) {
@@ -236,23 +252,22 @@ export default function Home() {
         formData.append('files', file);
       });
       formData.append('numQuestions', numQuestions.toString());
-      formData.append('comprehensiveMode', comprehensiveMode.toString());
       formData.append('fileType', fileType);
       formData.append('documentType', documentType);
-      formData.append('enableValidation', enableValidation.toString());
-      formData.append('enableTwoStageGeneration', enableTwoStageGeneration.toString());
       formData.append('generationMode', generationMode);
       formData.append('useTE', useTE.toString());
+      formData.append('generateExpansion', generateExpansion.toString());
+      formData.append('enableStability', enableStability.toString());
       
       // TE用プロンプトの送信
       if (useTE) {
         formData.append('teQuestionPrompt', teQuestionPrompt);
         formData.append('teAnswerPrompt', teAnswerPrompt);
-        
-        // 回答のみ生成モードの場合、既存の質問を送信
-        if (generationMode === 'answers_only' && existingQuestions.length > 0) {
-          formData.append('existingQuestions', JSON.stringify(existingQuestions));
-        }
+      }
+      
+      // 回答のみ生成モードの場合、既存の質問を送信（TEモード・C向けモード共通）
+      if (generationMode === 'answers_only' && existingQuestions.length > 0) {
+        formData.append('existingQuestions', JSON.stringify(existingQuestions));
       }
       
       // カスタムプロンプトが現在のドキュメントタイプのデフォルトと異なる場合のみ送信
@@ -275,6 +290,10 @@ export default function Home() {
       // 抽出されたテキストを設定
       if (data.extractedText) {
         setExtractedText(data.extractedText);
+        // 質問生成モード（questions_only または both）の場合、テキストを保存
+        if (generationMode === 'questions_only' || generationMode === 'both') {
+          setSavedExtractedText(data.extractedText);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
@@ -305,19 +324,84 @@ export default function Home() {
       
       try {
         const text = await file.text();
-        const lines = text.split('\n').filter(line => line.trim());
+        
+        // CSVパーサー関数
+        const parseCSV = (csvText: string): string[][] => {
+          const rows: string[][] = [];
+          let currentRow: string[] = [];
+          let currentField = '';
+          let insideQuotes = false;
+          let i = 0;
+          
+          // BOMを削除
+          const cleanText = csvText.replace(/^\uFEFF/, '');
+          
+          while (i < cleanText.length) {
+            const char = cleanText[i];
+            
+            if (char === '"') {
+              if (insideQuotes && cleanText[i + 1] === '"') {
+                // エスケープされたクォート
+                currentField += '"';
+                i += 2;
+              } else {
+                // クォートの開始または終了
+                insideQuotes = !insideQuotes;
+                i++;
+              }
+            } else if (char === ',' && !insideQuotes) {
+              // フィールドの区切り
+              currentRow.push(currentField);
+              currentField = '';
+              i++;
+            } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+              // 行の区切り
+              currentRow.push(currentField);
+              if (currentRow.some(field => field.trim() !== '')) {
+                rows.push(currentRow);
+              }
+              currentRow = [];
+              currentField = '';
+              
+              // \r\nの場合は\nもスキップ
+              if (char === '\r' && cleanText[i + 1] === '\n') {
+                i += 2;
+              } else {
+                i++;
+              }
+            } else {
+              currentField += char;
+              i++;
+            }
+          }
+          
+          // 最後のフィールドと行を追加
+          if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField);
+            if (currentRow.some(field => field.trim() !== '')) {
+              rows.push(currentRow);
+            }
+          }
+          
+          return rows;
+        };
+        
+        const rows = parseCSV(text);
         const parsedQuestions: Question[] = [];
         
         // ヘッダー行をスキップして処理
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i];
-          // CSVの各行をパース（カンマ区切りで、引用符内のカンマは無視）
-          const match = line.match(/(?:^|,)("(?:[^"]+|"")*"|[^,]*)/g);
-          if (match && match.length >= 2) {
-            const question = match[0].replace(/^,|^"|"$/g, '').replace(/""/g, '"').trim();
-            const answer = match[1].replace(/^,|^"|"$/g, '').replace(/""/g, '"').trim();
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (row.length >= 2) {
+            const question = row[0].trim();
+            const answer = row[1].trim();
+            // 拡張フィールドがある場合も処理
             if (question) {
-              parsedQuestions.push({ question, answer });
+              const questionObj: Question = { question, answer };
+              if (row.length > 2 && row[2]) questionObj.expansionData = row[2].trim();
+              if (row.length > 3 && row[3]) questionObj.pageNumber = row[3].trim();
+              if (row.length > 4 && row[4]) questionObj.location = row[4].trim();
+              parsedQuestions.push(questionObj);
             }
           }
         }
@@ -330,6 +414,7 @@ export default function Home() {
         
         setExistingQuestions(parsedQuestions);
         setError(null);
+        console.log(`読み込まれた質問数: ${parsedQuestions.length}`);
       } catch (err) {
         setError('CSVファイルの読み込み中にエラーが発生しました');
         setCsvFile(null);
@@ -426,28 +511,19 @@ export default function Home() {
                       />
                     ))}
                   </RadioGroup>
-                  <Button
-                    variant={useTE ? "contained" : "outlined"}
-                    color={useTE ? "secondary" : "primary"}
-                    onClick={() => {
-                      setUseTE(!useTE);
-                    }}
-                    sx={{ ml: 2, height: 'fit-content' }}
-                  >
-                    TE用プロンプト{useTE ? '使用中' : 'を使用'}
-                  </Button>
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  {useTE ? 'TE用の特別なプロンプトを使用しています' : 'ドキュメントの種別を選択すると、それに適したFAQ生成プロンプトが自動的に設定されます'}
+                  {documentType === 'enterprise' 
+                    ? 'B/E向けでは質問と回答を分離して生成する高精度モードが自動的に使用されます' 
+                    : 'C向けでは標準のFAQ生成プロンプトが使用されます'}
                 </Typography>
               </FormControl>
             </Box>
 
             <Divider />
 
-            {/* TE用の場合、生成モードとプロンプト編集 */}
-            {useTE && (
-              <>
+            {/* 生成モード選択（TE用と通常モード両方で使用） */}
+            <>
                 <Box>
                   <FormControl component="fieldset">
                     <FormLabel component="legend">
@@ -484,9 +560,10 @@ export default function Home() {
                     </Typography>
                   </FormControl>
                 </Box>
+            </>
 
-                {/* 回答のみ生成モードの場合、CSVアップロード */}
-                {generationMode === 'answers_only' && (
+            {/* 回答のみ生成モードの場合、CSVアップロード */}
+            {generationMode === 'answers_only' && (
                   <Box sx={{ p: 2, border: '2px dashed #ccc', borderRadius: 2, backgroundColor: '#f5f5f5' }}>
                     <Typography variant="h6" gutterBottom>
                       既存の質問CSVファイルをアップロード
@@ -524,10 +601,12 @@ export default function Home() {
                       </Box>
                     )}
                   </Box>
-                )}
+            )}
 
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  {(generationMode === 'questions_only' || generationMode === 'both') && (
+            {/* TE用プロンプト編集 */}
+            {useTE && (
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                {(generationMode === 'questions_only' || generationMode === 'both') && (
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" gutterBottom>
                         質問生成プロンプト
@@ -537,8 +616,8 @@ export default function Home() {
                         defaultPrompt={DEFAULT_TE_QUESTION_PROMPT}
                       />
                     </Box>
-                  )}
-                  {(generationMode === 'answers_only' || generationMode === 'both') && (
+                )}
+                {(generationMode === 'answers_only' || generationMode === 'both') && (
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" gutterBottom>
                         回答生成プロンプト
@@ -548,9 +627,8 @@ export default function Home() {
                         defaultPrompt={DEFAULT_TE_ANSWER_PROMPT}
                       />
                     </Box>
-                  )}
-                </Box>
-              </>
+                )}
+              </Box>
             )}
 
             {/* 通常のプロンプト編集セクション */}
@@ -636,19 +714,20 @@ export default function Home() {
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={comprehensiveMode}
-                      onChange={(e) => setComprehensiveMode(e.target.checked)}
+                      checked={generateExpansion}
+                      onChange={(e) => setGenerateExpansion(e.target.checked)}
                       color="primary"
+                      disabled={generationMode === 'questions_only'}
                     />
                   }
                   label={
                     <Box>
                       <Typography variant="body1" component="span">
-                        網羅的生成モード
+                        質問拡張データ・ページ数・場所を生成
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        AIが文書を分析してユーザーが疑問に思うであろう箇所を自動判断し、細かい部分まで網羅的に質問を生成します。
-                        このモードでは指定した質問数よりも多くの質問が生成される場合があります。
+                        回答生成時に、FAQ検索用の質問拡張データと、該当情報のページ数・場所を抽出します。
+                        処理時間が長くなる場合があります。
                       </Typography>
                     </Box>
                   }
@@ -658,53 +737,19 @@ export default function Home() {
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={enableValidation}
-                      onChange={(e) => {
-                        setEnableValidation(e.target.checked);
-                        if (e.target.checked) {
-                          setEnableTwoStageGeneration(false);
-                        }
-                      }}
+                      checked={enableStability}
+                      onChange={(e) => setEnableStability(e.target.checked)}
                       color="primary"
-                      disabled={enableTwoStageGeneration || useTE}
                     />
                   }
                   label={
                     <Box>
                       <Typography variant="body1" component="span">
-                        回答検証モード（標準精度）
+                        同一性担保モード（実験的機能）
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        生成された回答がドキュメントに基づいているか検証し、推測や憶測が含まれている場合は
-                        「この質問に回答するための情報がドキュメント内に不足しています。」に置き換えます。
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ alignItems: 'flex-start' }}
-                />
-                
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={enableTwoStageGeneration}
-                      onChange={(e) => {
-                        setEnableTwoStageGeneration(e.target.checked);
-                        if (e.target.checked) {
-                          setEnableValidation(false);
-                        }
-                      }}
-                      color="primary"
-                      disabled={enableValidation || useTE}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body1" component="span">
-                        2段階生成モード（最高精度）
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        質問生成と回答生成を分離して処理します。回答検証も自動的に含まれ、
-                        最も精度の高いFAQが生成されますが、処理時間が長くなります。
+                        質問を3回生成し、一致するものだけを出力します。
+                        より安定した質問セットが生成されますが、処理時間が約3倍になります。
                       </Typography>
                     </Box>
                   }
@@ -712,14 +757,9 @@ export default function Home() {
                 />
               </Box>
               
-              <Box sx={{ opacity: comprehensiveMode ? 0.5 : 1 }}>
+              <Box>
                 <Typography gutterBottom>
                   生成する質問数: {numQuestions}
-                  {comprehensiveMode && (
-                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                      （網羅的モードでは参考値として使用）
-                    </Typography>
-                  )}
                 </Typography>
                 <Slider
                   value={numQuestions}
@@ -729,7 +769,6 @@ export default function Home() {
                   step={1}
                   marks
                   valueLabelDisplay="auto"
-                  disabled={comprehensiveMode}
                 />
               </Box>
             </Box>
@@ -745,7 +784,7 @@ export default function Home() {
                   size="large"
                   onClick={() => console.log('Button clicked. isLoading:', isLoading, 'files:', files)}
                 >
-                  {fileType === 'pdf' ? 'PDF' : '画像'}からクエスチョンデータを生成
+                  {fileType === 'pdf' ? 'PDF' : '画像'}から{generationMode === 'questions_only' ? '質問' : generationMode === 'answers_only' ? '回答' : 'クエスチョンデータ'}を生成
                 </Button>
               </Stack>
             </Box>
@@ -823,14 +862,81 @@ export default function Home() {
           {questions.map((item, index) => (
             <Accordion key={index}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>
-                  <strong>Q{index + 1}:</strong> {item.question}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 2 }}>
+                  <Typography sx={{ flexGrow: 1 }}>
+                    <strong>Q{index + 1}:</strong> {item.question}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingIndex(index);
+                      setEditedQuestion(item.question);
+                      setEditedAnswer(item.answer);
+                    }}
+                    sx={{ ml: 1 }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </AccordionSummary>
               <AccordionDetails>
-                <Typography>
-                  <strong>回答:</strong> {item.answer}
-                </Typography>
+                {editingIndex === index ? (
+                  <Box sx={{ width: '100%' }}>
+                    <TextField
+                      fullWidth
+                      label="質問"
+                      value={editedQuestion}
+                      onChange={(e) => setEditedQuestion(e.target.value)}
+                      multiline
+                      rows={2}
+                      sx={{ mb: 2 }}
+                    />
+                    <TextField
+                      fullWidth
+                      label="回答"
+                      value={editedAnswer}
+                      onChange={(e) => setEditedAnswer(e.target.value)}
+                      multiline
+                      rows={4}
+                      sx={{ mb: 2 }}
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        startIcon={<SaveIcon />}
+                        variant="contained"
+                        size="small"
+                        onClick={() => {
+                          const newQuestions = [...questions];
+                          newQuestions[index] = {
+                            question: editedQuestion,
+                            answer: editedAnswer
+                          };
+                          setQuestions(newQuestions);
+                          setEditingIndex(null);
+                        }}
+                      >
+                        保存
+                      </Button>
+                      <Button
+                        startIcon={<CancelIcon />}
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setEditingIndex(null);
+                          setEditedQuestion('');
+                          setEditedAnswer('');
+                        }}
+                      >
+                        キャンセル
+                      </Button>
+                    </Stack>
+                  </Box>
+                ) : (
+                  <Typography>
+                    <strong>回答:</strong> {item.answer}
+                  </Typography>
+                )}
               </AccordionDetails>
             </Accordion>
           ))}

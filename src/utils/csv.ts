@@ -111,18 +111,44 @@ function cleanText(text: string): string {
 
 /**
  * QAデータをCSV形式に変換する
- * @param questions 質問と回答のリスト
+ * @param questions 質問と回答のリスト（拡張フィールドも含む）
  * @returns CSV形式の文字列
  */
-export function convertQuestionsToCSV(questions: Array<{ question: string, answer: string }>): string {
+export function convertQuestionsToCSV(
+  questions: Array<{
+    question: string;
+    answer: string;
+    pageNumber?: string;
+    location?: string;
+    expansionData?: string;
+  }>
+): string {
+  // 拡張データが含まれているかチェック
+  const hasExpansionData = questions.some(q => q.pageNumber || q.location || q.expansionData);
+  
   // CSVヘッダー
-  const headers = ['質問', '回答'];
+  const headers = hasExpansionData 
+    ? ['質問', '回答', '質問拡張データ', 'ページ数', '場所']
+    : ['質問', '回答'];
   
   // CSVの行を作成
-  const rows = questions.map(item => [
-    escapeCSVField(item.question),
-    escapeCSVField(item.answer)
-  ]);
+  const rows = questions.map(item => {
+    const baseFields = [
+      escapeCSVField(item.question),
+      escapeCSVField(item.answer)
+    ];
+    
+    if (hasExpansionData) {
+      return [
+        ...baseFields,
+        escapeCSVField(item.expansionData || ''),
+        escapeCSVField(item.pageNumber || ''),
+        escapeCSVField(item.location || '')
+      ];
+    }
+    
+    return baseFields;
+  });
   
   // ヘッダーと行を結合
   const csvContent = [headers, ...rows]

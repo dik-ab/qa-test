@@ -43,8 +43,7 @@ export async function POST(request: NextRequest) {
     const questions = await generateQuestionsFromText(
       truncatedText, 
       numQuestions, 
-      customPrompt || undefined,
-      comprehensiveMode
+      customPrompt || undefined
     );
 
     return NextResponse.json({ 

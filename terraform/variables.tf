@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-northeast-1"
 }
 
 variable "app_name" {
@@ -100,7 +100,7 @@ variable "environment_variables" {
   type        = map(string)
   default = {
     NODE_ENV   = "production"
-    AWS_REGION = "us-east-1"
+    AWS_REGION = "ap-northeast-1"
     PORT       = "3000"
   }
 }

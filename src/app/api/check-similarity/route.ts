@@ -3,11 +3,16 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 
 // AWS Bedrock クライアントの初期化
 const bedrockClient = new BedrockRuntimeClient({
-  region: 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
+  region: process.env.AWS_REGION || 'ap-northeast-1',
+  ...(process.env.NODE_ENV === 'production' 
+    ? {}
+    : {
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        },
+      }
+  ),
 });
 
 // Claude 3.5 Sonnet モデルID
