@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // AWS Bedrock クライアントの初期化
 const bedrockClient = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'ap-northeast-1',
   // 本番環境（App Runner）ではインスタンスロールを使用
   // ローカル開発環境では環境変数から認証情報を取得
   ...(process.env.NODE_ENV === 'production' 
