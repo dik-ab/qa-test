@@ -17,7 +17,7 @@ run:
     - name: NODE_ENV
       value: production
     - name: AWS_REGION
-      value: us-east-1
+      value: ap-northeast-1
     - name: PORT
       value: "3000"
     # Google Cloud Document AI環境変数はDockerイメージのbuild時に設定される
