@@ -16,7 +16,7 @@ const bedrockClient = new BedrockRuntimeClient({
 });
 
 // Claude 4.5 Sonnet モデルID
-const MODEL_ID = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
+const MODEL_ID = 'global.anthropic.claude-sonnet-4-5-20250929-v1:0';
 
 /**
  * 質問拡張データを生成する

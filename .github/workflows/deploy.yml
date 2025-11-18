@@ -52,29 +52,21 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-    - name: Update App Runner Service
+    - name: Display deployment info
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # App Runnerサービスを更新（新しいイメージをデプロイ）
+        # App Runnerサービス情報を表示（自動デプロイが有効なので手動更新は不要）
         SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$ECR_REPOSITORY'].ServiceArn" --output text)
         if [ -n "$SERVICE_ARN" ]; then
-          echo "Updating App Runner service: $SERVICE_ARN"
-          aws apprunner start-deployment --service-arn $SERVICE_ARN
-          
-          # デプロイメントの完了を待機
-          echo "Waiting for deployment to complete..."
-          aws apprunner wait service-updated --service-arn $SERVICE_ARN
-          
-          # サービスのURLを取得
+          echo "App Runner service found: $SERVICE_ARN"
           SERVICE_URL=$(aws apprunner describe-service --service-arn $SERVICE_ARN --query "Service.ServiceUrl" --output text)
-          echo "Application deployed successfully!"
           echo "Service URL: https://$SERVICE_URL"
+          echo "Image pushed successfully! Auto-deployment will start automatically."
         else
-          echo "App Runner service not found. Please check the service name."
-          exit 1
+          echo "App Runner service not found. Service may still be initializing."
         fi
 
   test:
