@@ -23,7 +23,7 @@ const bedrockClient = new BedrockRuntimeClient({
 });
 
 // Claude 4.5 Sonnet モデルID (PDFサポート付き)
-const MODEL_ID = 'anthropic.claude-sonnet-4-5-20250929-v1:0';
+const MODEL_ID = 'global.anthropic.claude-sonnet-4-5-20250929-v1:0';
 
 // デフォルトプロンプトを定数として定義
 export const DEFAULT_PROMPT = `
