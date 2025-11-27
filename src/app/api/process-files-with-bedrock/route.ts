@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
     const files = formData.getAll('files') as File[];
     const numQuestions = Number(formData.get('numQuestions') || 5);
     const customPrompt = formData.get('customPrompt') as string | null;
+    const customQuestionPrompt = formData.get('customQuestionPrompt') as string | null;
+    const customAnswerPrompt = formData.get('customAnswerPrompt') as string | null;
     const fileType = formData.get('fileType') as string;
     const documentType = (formData.get('documentType') as DocumentType) || 'consumer';
     const generationMode = (formData.get('generationMode') as GenerationMode) || 'both';
@@ -59,21 +61,38 @@ export async function POST(request: NextRequest) {
       let answerPrompt: string | undefined;
       
       if (useTE) {
-        try {
-          questionPrompt = readFileSync(join(process.cwd(), 'src/prompts/te-q.txt'), 'utf8');
-          answerPrompt = readFileSync(join(process.cwd(), 'src/prompts/te-ans.txt'), 'utf8');
-        } catch (error) {
-          console.log('Using user-provided TE prompts');
+        // TEモード: ユーザー提供のプロンプトがあればそれを優先
+        if (teQuestionPrompt || teAnswerPrompt) {
           questionPrompt = teQuestionPrompt || undefined;
           answerPrompt = teAnswerPrompt || undefined;
+        } else {
+          // ユーザー提供がなければファイルから読み込み
+          try {
+            questionPrompt = readFileSync(join(process.cwd(), 'src/prompts/te-q.txt'), 'utf8');
+            answerPrompt = readFileSync(join(process.cwd(), 'src/prompts/te-ans.txt'), 'utf8');
+          } catch (error) {
+            console.log('Failed to read TE prompt files');
+          }
         }
       } else if (documentType === 'enterprise') {
-        // B/E向けの場合、docomoプロンプトを使用
-        try {
-          questionPrompt = readFileSync(join(process.cwd(), 'src/prompts/docomo-q.txt'), 'utf8');
-          answerPrompt = readFileSync(join(process.cwd(), 'src/prompts/docomo-ans.txt'), 'utf8');
-        } catch (error) {
-          console.log('Using default prompts for enterprise');
+        // B/E向け: カスタムプロンプトがあればそれを優先
+        if (customQuestionPrompt || customAnswerPrompt) {
+          questionPrompt = customQuestionPrompt || undefined;
+          answerPrompt = customAnswerPrompt || undefined;
+        } else {
+          // カスタムプロンプトがなければdocomoプロンプトを使用
+          try {
+            questionPrompt = readFileSync(join(process.cwd(), 'src/prompts/docomo-q.txt'), 'utf8');
+            answerPrompt = readFileSync(join(process.cwd(), 'src/prompts/docomo-ans.txt'), 'utf8');
+          } catch (error) {
+            console.log('Failed to read docomo prompt files');
+          }
+        }
+      } else {
+        // C向け直接生成の場合
+        if (customPrompt) {
+          questionPrompt = customPrompt;
+          answerPrompt = customPrompt;
         }
       }
       
