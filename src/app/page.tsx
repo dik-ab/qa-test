@@ -106,6 +106,7 @@ export default function Home() {
   const [editedAnswer, setEditedAnswer] = useState<string>('');
   const [generateExpansion, setGenerateExpansion] = useState<boolean>(false);
   const [enableStability, setEnableStability] = useState<boolean>(false);
+  const [useDirectGeneration, setUseDirectGeneration] = useState<boolean>(true); // デフォルトで直接生成を使用
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -258,6 +259,7 @@ export default function Home() {
       formData.append('useTE', useTE.toString());
       formData.append('generateExpansion', generateExpansion.toString());
       formData.append('enableStability', enableStability.toString());
+      formData.append('useDirectGeneration', useDirectGeneration.toString());
       
       // TE用プロンプトの送信
       if (useTE) {
@@ -711,6 +713,26 @@ export default function Home() {
               </Typography>
               
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={useDirectGeneration}
+                      onChange={(e) => setUseDirectGeneration(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" component="span">
+                        ダイレクト生成モード（推奨）
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        ドキュメントから直接QAを生成します。レイアウトや表構造を考慮したより正確な生成が可能です。
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start' }}
+                />
                 <FormControlLabel
                   control={
                     <Checkbox

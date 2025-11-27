@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { generateQuestionsFromText } from '@/utils/bedrock';
+import { generateQuestionsFromText, generateQuestionsDirectlyFromDocument, generateQAFlexibleDirectly } from '@/utils/bedrock';
 import { DocumentType, getPromptForDocumentType } from '@/utils/document-type-prompts';
 import { GenerationMode, generateFAQFlexible } from '@/utils/flexible-generation';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 export const maxDuration = 60;
 
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
     const existingQuestions = existingQuestionsJson ? JSON.parse(existingQuestionsJson) : undefined;
     const generateExpansion = formData.get('generateExpansion') === 'true';
     const enableStability = formData.get('enableStability') === 'true';
+    const useDirectGeneration = formData.get('useDirectGeneration') === 'true';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -47,6 +50,92 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 直接生成モードの場合
+    if (useDirectGeneration) {
+      let allQuestions: any[] = [];
+      
+      // プロンプトファイルから読み込み（TEモードまたはdocomoモード）
+      let questionPrompt: string | undefined;
+      let answerPrompt: string | undefined;
+      
+      if (useTE) {
+        try {
+          questionPrompt = readFileSync(join(process.cwd(), 'src/prompts/te-q.txt'), 'utf8');
+          answerPrompt = readFileSync(join(process.cwd(), 'src/prompts/te-ans.txt'), 'utf8');
+        } catch (error) {
+          console.log('Using user-provided TE prompts');
+          questionPrompt = teQuestionPrompt || undefined;
+          answerPrompt = teAnswerPrompt || undefined;
+        }
+      } else if (documentType === 'enterprise') {
+        // B/E向けの場合、docomoプロンプトを使用
+        try {
+          questionPrompt = readFileSync(join(process.cwd(), 'src/prompts/docomo-q.txt'), 'utf8');
+          answerPrompt = readFileSync(join(process.cwd(), 'src/prompts/docomo-ans.txt'), 'utf8');
+        } catch (error) {
+          console.log('Using default prompts for enterprise');
+        }
+      }
+      
+      // 各ファイルに対して直接生成
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+        
+        // MIMEタイプの決定
+        let mimeType = file.type;
+        if (fileType === 'pdf') {
+          mimeType = 'application/pdf';
+        } else if (!mimeType || mimeType === 'application/octet-stream') {
+          const extension = file.name.split('.').pop()?.toLowerCase();
+          const mimeTypeMap: { [key: string]: string } = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'webp': 'image/webp'
+          };
+          mimeType = mimeTypeMap[extension || ''] || 'image/jpeg';
+        }
+        
+        let questions;
+        
+        if (generationMode === 'both' && !useTE && documentType !== 'enterprise') {
+          // 統合生成モード（C向けの通常モード）
+          questions = await generateQuestionsDirectlyFromDocument(
+            fileBuffer,
+            fileType as 'pdf' | 'image',
+            mimeType,
+            numQuestions,
+            customPrompt || undefined
+          );
+        } else {
+          // 分離生成モード（TEモード、B/E向け、または分離モード指定時）
+          questions = await generateQAFlexibleDirectly(
+            fileBuffer,
+            fileType as 'pdf' | 'image',
+            mimeType,
+            generationMode,
+            numQuestions,
+            existingQuestions,
+            questionPrompt || customPrompt || undefined,
+            answerPrompt || customPrompt || undefined,
+            generateExpansion,
+            enableStability
+          );
+        }
+        
+        allQuestions = allQuestions.concat(questions);
+      }
+      
+      return NextResponse.json({
+        questions: allQuestions,
+        extractedText: '直接生成モードではテキスト抽出は行われません'
+      });
+    }
+    
+    // 従来のテキスト抽出モード
     const allExtractedTexts = [];
 
     // ファイル処理ループ
