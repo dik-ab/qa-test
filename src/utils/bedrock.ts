@@ -422,6 +422,372 @@ ${answer}
 }
 
 /**
+ * ドキュメントから直接QAペアを生成する（統合生成）
+ * @param documentData ドキュメントのバイナリデータ
+ * @param documentType ドキュメントの種類（'pdf' | 'image'）
+ * @param mimeType MIMEタイプ
+ * @param numQuestions 生成する質問の数
+ * @param customPrompt カスタムプロンプト（オプション）
+ * @returns 生成された質問と回答のリスト
+ */
+export async function generateQuestionsDirectlyFromDocument(
+  documentData: Buffer,
+  documentType: 'pdf' | 'image',
+  mimeType: string,
+  numQuestions: number = 5,
+  customPrompt?: string
+): Promise<Array<{ question: string, answer: string }>> {
+  try {
+    const base64Data = documentData.toString('base64');
+    
+    // プロンプトの準備（カスタムまたはデフォルト）
+    const prompt = customPrompt 
+      ? customPrompt.replace(/\$\{numQuestions\}/g, numQuestions.toString())
+      : `このドキュメントを直接分析して、以下の条件に従って${numQuestions}個の質問と回答を生成してください：
+
+## 【重要】固有名詞の保持について：
+- **キャンペーン名、サービス名、商品名は必ず完全な正式名称を使用する**
+- 名称は一切省略しない
+- 「このキャンペーン」「該当キャンペーン」「当キャンペーン」などの代名詞は絶対に使用しない
+- ドキュメント内に記載されている正式名称をそのまま質問文に含める
+
+## 質問生成の条件：
+1. **完全な固有名詞の使用**：キャンペーン名、サービス名、商品名はドキュメントに記載されている完全な正式名称を必ず使用し、一切省略しない
+2. **具体性を重視**：「このキャンペーン」「この制度」「この手順」などの曖昧な表現は絶対に避け、ドキュメント内の具体的な名称、数値、期間、条件を明記した質問を作成する
+3. **理解が困難な箇所を重点的に**：専門用語、複雑な概念、手順、重要な数値や日付、条件や制限事項など、ユーザーが理解に困る可能性が高い部分を優先的に質問化する
+4. **実用的な詳細情報**：ユーザーが実際に行動を起こす際に必要となる具体的な情報（金額、期間、手順、対象者、条件など）を質問に含める
+5. **多様な質問パターン**：「〜の金額は」「〜の期限は」「〜の対象者は」「〜の手順は」「〜の条件は」「〜の計算方法は」など、様々な角度からの質問を含める
+
+## 回答生成の条件：
+1. **簡潔性**：要点を絞り、冗長な説明は避ける（目安：1-3文程度）
+2. **丁寧さ**：敬語を使用し、分かりやすい言葉で説明する
+3. **正確性**：ドキュメントの内容に忠実で、推測や憶測は含めない
+4. **具体的な数値や条件**：金額、期間、パーセンテージ、対象者などの具体的な情報を明記する
+5. **構造化**：必要に応じて箇条書きや番号付きリストを使用して読みやすくする
+
+## 出力形式：
+以下のJSON形式で返してください。JSONのみを返し、説明や追加のテキストは不要です：
+
+[
+  {
+    "question": "ドキュメントの具体的な内容を含む明確で詳細な質問文（固有名詞は完全な正式名称を使用）",
+    "answer": "具体的な数値や条件を含む簡潔で丁寧な回答文"
+  }
+]`;
+
+    // ドキュメントのコンテンツを構築
+    const content = [
+      {
+        type: 'text',
+        text: prompt
+      },
+      {
+        type: documentType === 'pdf' ? 'document' : 'image',
+        source: {
+          type: 'base64',
+          media_type: mimeType,
+          data: base64Data
+        }
+      }
+    ];
+
+    // Bedrockへのリクエスト
+    const response = await bedrockClient.send(
+      new InvokeModelCommand({
+        modelId: MODEL_ID,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          max_tokens: 8192,
+          messages: [
+            {
+              role: 'user',
+              content
+            }
+          ]
+        }),
+      })
+    );
+    
+    // レスポンスの解析
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const responseText = responseBody.content[0].text;
+    
+    // JSONの抽出（余分なテキストがある場合に対応）
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    // 直接JSONとして解析できる場合
+    try {
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('AIからの応答をJSONとして解析できませんでした');
+    }
+  } catch (error) {
+    console.error('Error generating questions directly from document:', error);
+    throw error;
+  }
+}
+
+/**
+ * ドキュメントから直接QAペアを生成する（分離生成モード）
+ * @param documentData ドキュメントのバイナリデータ
+ * @param documentType ドキュメントの種類（'pdf' | 'image'）
+ * @param mimeType MIMEタイプ
+ * @param generationMode 生成モード（'questions_only' | 'answers_only' | 'both'）
+ * @param numQuestions 生成する質問の数
+ * @param existingQuestions 既存の質問（answers_onlyモードで使用）
+ * @param questionPrompt 質問生成用プロンプト
+ * @param answerPrompt 回答生成用プロンプト
+ * @param generateExpansion 拡張データ生成フラグ
+ * @param enableStability 同一性担保モードフラグ
+ * @returns 生成された質問と回答のリスト
+ */
+export async function generateQAFlexibleDirectly(
+  documentData: Buffer,
+  documentType: 'pdf' | 'image',
+  mimeType: string,
+  generationMode: 'questions_only' | 'answers_only' | 'both',
+  numQuestions: number = 5,
+  existingQuestions?: Array<{ question: string, answer: string }>,
+  questionPrompt?: string,
+  answerPrompt?: string,
+  generateExpansion: boolean = false,
+  enableStability: boolean = false
+): Promise<Array<{ question: string, answer: string, pageNumber?: string, location?: string, expansionData?: string }>> {
+  try {
+    const base64Data = documentData.toString('base64');
+    let questions: Array<{ question: string, answer: string }> = [];
+
+    // 質問生成フェーズ（questions_only または both モード）
+    if (generationMode === 'questions_only' || generationMode === 'both') {
+      const qPrompt = questionPrompt 
+        ? questionPrompt.replace(/\{num_questions\}/g, numQuestions.toString())
+        : `このドキュメントを分析して${numQuestions}個の質問を生成してください。質問のみを生成し、回答は空欄にしてください。
+
+## 質問生成の条件：
+1. **固有名詞は完全な正式名称を使用**
+2. **具体的で明確な質問文**
+3. **多様な観点からの質問**
+
+## 出力形式：
+[
+  {
+    "question": "具体的な質問文",
+    "answer": ""
+  }
+]`;
+
+      if (enableStability) {
+        // 同一性担保モード：3回生成して一致するもののみ採用
+        const generatedSets: Array<Array<{ question: string, answer: string }>> = [];
+        
+        for (let i = 0; i < 3; i++) {
+          const response = await bedrockClient.send(
+            new InvokeModelCommand({
+              modelId: MODEL_ID,
+              contentType: 'application/json',
+              accept: 'application/json',
+              body: JSON.stringify({
+                anthropic_version: 'bedrock-2023-05-31',
+                max_tokens: 4096,
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: qPrompt
+                      },
+                      {
+                        type: documentType === 'pdf' ? 'document' : 'image',
+                        source: {
+                          type: 'base64',
+                          media_type: mimeType,
+                          data: base64Data
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }),
+            })
+          );
+          
+          const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+          const responseText = responseBody.content[0].text;
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            generatedSets.push(JSON.parse(jsonMatch[0]));
+          }
+        }
+
+        // 3つのセットから共通する質問を抽出
+        const questionOccurrences = new Map<string, number>();
+        generatedSets.forEach(set => {
+          set.forEach(qa => {
+            const count = questionOccurrences.get(qa.question) || 0;
+            questionOccurrences.set(qa.question, count + 1);
+          });
+        });
+
+        // 2回以上出現した質問を採用
+        questionOccurrences.forEach((count, question) => {
+          if (count >= 2 && questions.length < numQuestions) {
+            questions.push({ question, answer: '' });
+          }
+        });
+
+        // 不足分は最初のセットから補充
+        if (questions.length < numQuestions && generatedSets.length > 0) {
+          generatedSets[0].forEach(qa => {
+            if (!questions.find(q => q.question === qa.question) && questions.length < numQuestions) {
+              questions.push(qa);
+            }
+          });
+        }
+      } else {
+        // 通常モード：1回生成
+        const response = await bedrockClient.send(
+          new InvokeModelCommand({
+            modelId: MODEL_ID,
+            contentType: 'application/json',
+            accept: 'application/json',
+            body: JSON.stringify({
+              anthropic_version: 'bedrock-2023-05-31',
+              max_tokens: 4096,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: qPrompt
+                    },
+                    {
+                      type: documentType === 'pdf' ? 'document' : 'image',
+                      source: {
+                        type: 'base64',
+                        media_type: mimeType,
+                        data: base64Data
+                      }
+                    }
+                  ]
+                }
+              ]
+            }),
+          })
+        );
+        
+        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+        const responseText = responseBody.content[0].text;
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          questions = JSON.parse(jsonMatch[0]);
+        }
+      }
+    } else if (generationMode === 'answers_only' && existingQuestions) {
+      // 既存の質問を使用
+      questions = existingQuestions;
+    }
+
+    // 回答生成フェーズ（answers_only または both モード）
+    if (generationMode === 'answers_only' || generationMode === 'both') {
+      const questionsText = questions.map(q => q.question).join('\n');
+      const aPrompt = answerPrompt 
+        ? answerPrompt.replace(/\{question_list\}/g, questionsText).replace(/\{questions_list\}/g, questionsText)
+        : `以下の質問リストに対して、このドキュメントから正確な回答を生成してください。
+
+## 質問リスト
+${questionsText}
+
+## 回答作成ルール
+1. **ドキュメントの内容に基づく正確な回答**
+2. **簡潔で分かりやすい説明**
+3. **具体的な数値や条件を明記**
+
+${generateExpansion ? `
+## 追加情報の抽出
+各回答について以下も抽出してください：
+- pageNumber: 該当情報のページ番号
+- location: ドキュメント内の場所（例：「表1」「セクション2.3」）
+- expansionData: FAQ検索用の質問拡張データ
+` : ''}
+
+## 出力形式：
+[
+  {
+    "question": "元の質問文",
+    "answer": "生成された回答"${generateExpansion ? `,
+    "pageNumber": "ページ番号",
+    "location": "場所",
+    "expansionData": "拡張データ"` : ''}
+  }
+]`;
+
+      const response = await bedrockClient.send(
+        new InvokeModelCommand({
+          modelId: MODEL_ID,
+          contentType: 'application/json',
+          accept: 'application/json',
+          body: JSON.stringify({
+            anthropic_version: 'bedrock-2023-05-31',
+            max_tokens: 8192,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: aPrompt
+                  },
+                  {
+                    type: documentType === 'pdf' ? 'document' : 'image',
+                    source: {
+                      type: 'base64',
+                      media_type: mimeType,
+                      data: base64Data
+                    }
+                  }
+                ]
+              }
+            ]
+          }),
+        })
+      );
+      
+      const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+      const responseText = responseBody.content[0].text;
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const answersWithQuestions = JSON.parse(jsonMatch[0]);
+        
+        // 質問と回答をマージ
+        questions = questions.map((q, index) => {
+          const matchingAnswer = answersWithQuestions.find((a: any) => a.question === q.question) || answersWithQuestions[index];
+          return {
+            question: q.question,
+            answer: matchingAnswer?.answer || '',
+            ...(generateExpansion && matchingAnswer?.pageNumber ? { pageNumber: matchingAnswer.pageNumber } : {}),
+            ...(generateExpansion && matchingAnswer?.location ? { location: matchingAnswer.location } : {}),
+            ...(generateExpansion && matchingAnswer?.expansionData ? { expansionData: matchingAnswer.expansionData } : {})
+          };
+        });
+      }
+    }
+
+    return questions;
+  } catch (error) {
+    console.error('Error generating QA flexibly from document:', error);
+    throw error;
+  }
+}
+
+/**
  * QA精査処理と差分生成を統合した関数
  * @param originalQAData 精査前のQAデータ
  * @returns 精査後のQAデータと差分レポートのパス

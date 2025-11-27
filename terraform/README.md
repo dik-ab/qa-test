@@ -57,7 +57,7 @@ terraform apply
 
 ```bash
 # ECRにログイン
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ECR_REPOSITORY_URL>
+aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin <ECR_REPOSITORY_URL>
 
 # Dockerイメージをビルド
 docker build -t qamatching-app .
@@ -130,7 +130,7 @@ docker push <ECR_REPOSITORY_URL>:latest
 app_name = "your-app-name"
 
 # リージョン
-aws_region = "us-east-1"
+aws_region = "ap-northeast-1"
 
 # インスタンス設定
 cpu    = "0.5 vCPU"
@@ -144,7 +144,7 @@ max_concurrency = 100
 # 環境変数
 environment_variables = {
   NODE_ENV   = "production"
-  AWS_REGION = "us-east-1"
+  AWS_REGION = "ap-northeast-1"
   PORT       = "3000"
   # 追加の環境変数
 }

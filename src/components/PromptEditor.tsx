@@ -114,7 +114,11 @@ export default function PromptEditor({ onPromptChange, defaultPrompt }: PromptEd
           <Box sx={{ mb: 2 }}>
             <Alert severity="info" sx={{ mb: 2 }}>
               プロンプトを編集して、質問生成の方法をカスタマイズできます。
-              <code>{'${text}'}</code> と <code>{'${numQuestions}'}</code> は自動的に置換されます。
+              {currentPrompt.includes('{num_questions}') && <><code>{'{num_questions}'}</code> は生成する質問数に置換されます。</>}
+              {currentPrompt.includes('{question_list}') && <><code>{'{question_list}'}</code> は質問リストに置換されます。</>}
+              {currentPrompt.includes('{questions_list}') && <><code>{'{questions_list}'}</code> は質問リストに置換されます。</>}
+              {currentPrompt.includes('${text}') && <><code>{'${text}'}</code> は抽出されたテキストに置換されます。</>}
+              {currentPrompt.includes('${numQuestions}') && <><code>{'${numQuestions}'}</code> は生成する質問数に置換されます。</>}
             </Alert>
             
             <TextField
@@ -139,12 +143,26 @@ export default function PromptEditor({ onPromptChange, defaultPrompt }: PromptEd
             <Typography variant="caption" color="text.secondary">
               利用可能な変数:
             </Typography>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 0.5, borderRadius: 0.5 }}>
-              {'${text}'}
-            </Typography>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 0.5, borderRadius: 0.5 }}>
-              {'${numQuestions}'}
-            </Typography>
+            {currentPrompt.includes('${text}') && (
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 0.5, borderRadius: 0.5 }}>
+                {'${text}'}
+              </Typography>
+            )}
+            {currentPrompt.includes('${numQuestions}') && (
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 0.5, borderRadius: 0.5 }}>
+                {'${numQuestions}'}
+              </Typography>
+            )}
+            {currentPrompt.includes('{num_questions}') && (
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 0.5, borderRadius: 0.5 }}>
+                {'{num_questions}'}
+              </Typography>
+            )}
+            {(currentPrompt.includes('{question_list}') || currentPrompt.includes('{questions_list}')) && (
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 0.5, borderRadius: 0.5 }}>
+                {'{question_list}'}
+              </Typography>
+            )}
           </Box>
         </DialogContent>
         
