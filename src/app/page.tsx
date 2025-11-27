@@ -48,6 +48,7 @@ import PromptEditor from '@/components/PromptEditor';
 import { DocumentType, DOCUMENT_TYPE_OPTIONS, DOCUMENT_TYPE_PROMPTS } from '@/utils/document-type-prompts';
 import { GenerationMode } from '@/utils/flexible-generation';
 import { DEFAULT_TE_QUESTION_PROMPT, DEFAULT_TE_ANSWER_PROMPT } from '@/utils/te-prompts';
+import { DEFAULT_DOCOMO_QUESTION_PROMPT, DEFAULT_DOCOMO_ANSWER_PROMPT } from '@/utils/default-prompts';
 
 // 質問と回答の型定義
 interface Question {
@@ -92,6 +93,8 @@ export default function Home() {
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [savedExtractedText, setSavedExtractedText] = useState<string | null>(null); // 質問生成時のテキストを保存
   const [customPrompt, setCustomPrompt] = useState<string>(DOCUMENT_TYPE_PROMPTS['consumer']);
+  const [customQuestionPrompt, setCustomQuestionPrompt] = useState<string>('');  // 直接生成モード用質問プロンプト
+  const [customAnswerPrompt, setCustomAnswerPrompt] = useState<string>('');  // 直接生成モード用回答プロンプト
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
   const [isSimilarityLoading, setIsSimilarityLoading] = useState(false);
   const [documentType, setDocumentType] = useState<DocumentType>('consumer');
@@ -139,6 +142,12 @@ export default function Home() {
     // ドキュメントタイプに応じたデフォルトプロンプトを設定
     if (!customPrompt || Object.values(DOCUMENT_TYPE_PROMPTS).includes(customPrompt)) {
       setCustomPrompt(DOCUMENT_TYPE_PROMPTS[newType]);
+    }
+    
+    // 直接生成モード用のプロンプトも設定
+    if (newType === 'enterprise') {
+      setCustomQuestionPrompt(DEFAULT_DOCOMO_QUESTION_PROMPT);
+      setCustomAnswerPrompt(DEFAULT_DOCOMO_ANSWER_PROMPT);
     }
   };
 
@@ -272,8 +281,15 @@ export default function Home() {
         formData.append('existingQuestions', JSON.stringify(existingQuestions));
       }
       
-      // カスタムプロンプトが現在のドキュメントタイプのデフォルトと異なる場合のみ送信
-      if (customPrompt !== DOCUMENT_TYPE_PROMPTS[documentType]) {
+      // カスタムプロンプトの送信
+      if (useDirectGeneration && (generationMode === 'questions_only' || generationMode === 'both') && customQuestionPrompt) {
+        formData.append('customQuestionPrompt', customQuestionPrompt);
+      }
+      if (useDirectGeneration && (generationMode === 'answers_only' || generationMode === 'both') && customAnswerPrompt) {
+        formData.append('customAnswerPrompt', customAnswerPrompt);
+      }
+      // 従来のテキストモード用
+      if (!useDirectGeneration && customPrompt !== DOCUMENT_TYPE_PROMPTS[documentType]) {
         formData.append('customPrompt', customPrompt);
       }
       
@@ -606,7 +622,7 @@ export default function Home() {
             )}
 
             {/* TE用プロンプト編集 */}
-            {useTE && (
+            {useTE && useDirectGeneration && (
               <Box sx={{ display: 'flex', gap: 2 }}>
                 {(generationMode === 'questions_only' || generationMode === 'both') && (
                     <Box sx={{ flex: 1 }}>
@@ -632,9 +648,37 @@ export default function Home() {
                 )}
               </Box>
             )}
+            
+            {/* B/E向け(docomo)プロンプト編集 */}
+            {documentType === 'enterprise' && !useTE && useDirectGeneration && (
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                {(generationMode === 'questions_only' || generationMode === 'both') && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        質問生成プロンプト
+                      </Typography>
+                      <PromptEditor
+                        onPromptChange={setCustomQuestionPrompt}
+                        defaultPrompt={DEFAULT_DOCOMO_QUESTION_PROMPT}
+                      />
+                    </Box>
+                )}
+                {(generationMode === 'answers_only' || generationMode === 'both') && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        回答生成プロンプト
+                      </Typography>
+                      <PromptEditor
+                        onPromptChange={setCustomAnswerPrompt}
+                        defaultPrompt={DEFAULT_DOCOMO_ANSWER_PROMPT}
+                      />
+                    </Box>
+                )}
+              </Box>
+            )}
 
-            {/* 通常のプロンプト編集セクション */}
-            {!useTE && (
+            {/* 通常のプロンプト編集セクション(テキスト抽出モードやC向け直接生成) */}
+            {!useTE && (!useDirectGeneration || (useDirectGeneration && documentType === 'consumer')) && (
               <Box>
                 <Typography variant="h6" gutterBottom>
                   プロンプト設定
