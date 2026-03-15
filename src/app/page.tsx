@@ -247,7 +247,7 @@ export default function Home() {
     
     // TE回答のみ生成モードの場合、CSVファイルが必要
     if (useTE && generationMode === 'answers_only' && existingQuestions.length === 0) {
-      setError('回答のみ生成モードでは、EXCELファイルをアップロードしてください');
+      setError('回答のみ生成モードでは、WORDファイルをアップロードしてください');
       return;
     }
     
