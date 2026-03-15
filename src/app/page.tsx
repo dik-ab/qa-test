@@ -247,7 +247,7 @@ export default function Home() {
     
     // TE回答のみ生成モードの場合、CSVファイルが必要
     if (useTE && generationMode === 'answers_only' && existingQuestions.length === 0) {
-      setError('回答のみ生成モードでは、CSVファイルをアップロードしてください');
+      setError('回答のみ生成モードでは、EXCELファイルをアップロードしてください');
       return;
     }
     
@@ -261,7 +261,7 @@ export default function Home() {
       files.forEach(file => {
         formData.append('files', file);
       });
-      formData.append('numQuestions', numQuestions.toString());
+      formData.append('numQue', numQuestions.toString());
       formData.append('fileType', fileType);
       formData.append('documentType', documentType);
       formData.append('generationMode', generationMode);
