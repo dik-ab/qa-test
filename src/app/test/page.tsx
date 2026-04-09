@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Script from 'next/script';
 import { Box, Button, Typography, Container, Paper, TextField } from '@mui/material';
 
 export default function TestPage() {
@@ -8,7 +9,9 @@ export default function TestPage() {
   const [text, setText] = useState('');
 
   return (
-    <Container maxWidth="sm" sx={{ py: 4 }}>
+    <>
+      <Script src="https://api.stg.qa-maching.livepass-aiagent.com/api/spaces/nev_test/site_plugin.js" strategy="afterInteractive" />
+      <Container maxWidth="sm" sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>
         テストページ
       </Typography>
@@ -51,5 +54,6 @@ export default function TestPage() {
         )}
       </Paper>
     </Container>
+    </>
   );
 }
