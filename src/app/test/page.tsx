@@ -1,25 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Box, Button, Typography, Container, Paper, TextField } from '@mui/material';
 
 export default function TestPage() {
   const [count, setCount] = useState(0);
   const [text, setText] = useState('');
 
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://api.stg.qa-maching.livepass-aiagent.com/api/spaces/nev_test/site_plugin.js';
-    script.onload = () => {
-      if (typeof window.onload === 'function') {
-        window.onload(new Event('load'));
-      }
-    };
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
 
   return (
     <>
