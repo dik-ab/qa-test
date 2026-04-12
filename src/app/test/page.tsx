@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Script from 'next/script';
 import { Box, Button, Typography, Container, Paper, TextField } from '@mui/material';
 
 export default function TestPage() {
@@ -8,8 +9,17 @@ export default function TestPage() {
   const [text, setText] = useState('');
 
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const iframe = document.querySelector('.lp-qam-main-iframe');
+      if (iframe) iframe.classList.add('enabled');
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <>
+      <Script src="https://api.stg.qa-maching.livepass-aiagent.com/api/spaces/nev_test/site_plugin.js" strategy="afterInteractive" />
       <Container maxWidth="sm" sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>
         テストページ
